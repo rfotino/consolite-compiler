@@ -13,7 +13,7 @@ Comment syntax is the same as in C, single line comments start with `//` while m
 // I'm a single line comment, I don't affect the code!
 /* I'm a multi-line comment,
    I don't affect the code either! */
-   ```
+```
 
 ## Data Types
 
@@ -68,9 +68,9 @@ Syntax (the `else` part of the statement can be omitted):
 ```c
 if ([condition])
   [true-statement]
-  else
-    [false-statement]
-    ```
+else
+  [false-statement]
+```
 
 Example:
 
@@ -78,21 +78,21 @@ Example:
 uint16 a = 0, b = 1;
 if (a < b) {
   // Do something here
-  } else {
-    // Do something else here
-    }
-    ```
+} else {
+  // Do something else here
+}
+```
 
 Because `[false-statement]` can also be an if-else statement, you can chain these into something like the following:
 
 ```c
 if ([condition1])
   [statement1]
-  else if ([condition2])
-    [statement2]
-    else
-      [statement3]
-      ```
+else if ([condition2])
+  [statement2]
+else
+  [statement3]
+```
 
 ### Labels and goto
 
@@ -104,8 +104,8 @@ label:
 i = i + 1;
 if (i < 10) {
   goto label;
-  }
-  ```
+}
+```
 
 Labels are declared with a name followed by a colon. They are local to a function, meaning you can't use goto to jump between functions and you can have labels with the same name in different functions.
 
@@ -118,7 +118,7 @@ Syntax:
 ```c
 for ([initialization]; [condition]; [final-statement])
   [statement]
-  ```
+```
 
 Equivalent to:
 
@@ -127,19 +127,19 @@ Equivalent to:
 start:
 if (![condition])
   goto end;
-  [statement]
-  [final-statement]
-  goto start;
-  end:
-  ```
+[statement]
+[final-statement]
+goto start;
+end:
+```
 
 Example:
 ```c
 uint16 i;
 for (i = 0; i < 32; i = i + 1) {
   // Loop body, do something here
-  }
-  ```
+}
+```
 
 For loops are often used to iterate over an array, or to do an action a set number of times.
 
@@ -150,7 +150,7 @@ Syntax:
 ```c
 while ([condition])
   [statement]
-  ```
+```
 
 Equivalent to:
 
@@ -158,10 +158,10 @@ Equivalent to:
 start:
 if (![condition])
   goto end;
-  [statement]
-  goto start;
-  end:
-  ```
+[statement]
+goto start;
+end:
+```
 
 Example:
 
@@ -169,8 +169,8 @@ Example:
 uint16 i = 0;
 while (i < 10) {
   // do something
-  }
-  ```
+}
+```
 
 While loops are often used for more general terminating conditions that don't involve iteration.
 
@@ -181,8 +181,8 @@ Syntax:
 ```c
 do
   [statement]
-  while ([condition]);
-  ```
+while ([condition]);
+```
 
 Equivalent to:
 
@@ -191,7 +191,7 @@ start:
 [statement]
 if ([condition])
   goto start;
-  ```
+```
 
 Example:
 
@@ -199,8 +199,8 @@ Example:
 uint16 i = 10;
 do {
   // something that should be done at least once
-  } while (i < 10);
-  ```
+} while (i < 10);
+```
 
 Do while loops will execute the body of the loop at least once because they execute the loop body *before* evaluating the condition.
 
@@ -221,8 +221,8 @@ Syntax:
 ```c
 [return-value] [function-name] ([param1], [param2], ...) {
   [function-body]
-  }
-  ```
+}
+```
 
 The `[return-value]` can be either a primitive data type or `void`, which indicates no return value. If there is a return value other than `void`, then the function must return a value for every possible code path. In a `void` function, using the `return;` statement will leave the function without executing any more statements.
 
@@ -233,29 +233,29 @@ Example 1:
 ```c
 int16 cmp(int16 a, int16 b) {
   if (a < b) {
-      return -1;
-        } else if (b < a) {
-            return 1;
-              }
-                return 0;
-                }
-                ```
+    return -1;
+  } else if (b < a) {
+    return 1;
+  }
+  return 0;
+}
+```
 
 Example 2:
 
 ```c
 void paint_rectangle(uint16 color,
                      uint16 x,     uint16 y,
-                                          uint16 width, uint16 height) {
-                                            int16 i, j;
-                                              COLOR(color);
-                                                for (i = x; i < x + width; i = i + 1) {
-                                                    for (j = y; j < y + height; j = j + 1) {
-                                                          PIXEL(x, y);
-                                                              }
-                                                                }
-                                                                }
-                                                                ```
+                     uint16 width, uint16 height) {
+  int16 i, j;
+  COLOR(color);
+  for (i = x; i < x + width; i = i + 1) {
+  	for (j = y; j < y + height; j = j + 1) {
+      PIXEL(x, y);
+    }
+  }
+}
+```
 
 ### Builtin Functions
 
