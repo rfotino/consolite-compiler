@@ -77,6 +77,8 @@ if (a < b) {
 }
 ```
 
+If the `[condition]` evaluates to a value other than zero, then the `[true-statement]` will be executed. Otherwise the `[false-statement]` will be executed.
+
 Because `[false-statement]` can also be an if-else statement, you can chain these into something like the following:
 
 ```c
@@ -251,6 +253,16 @@ void paint_rectangle(uint16 color,
 }
 ```
 
+### Entry Point
+
+The entry point of a program in Consolite C is a `main()` function, which takes no arguments and has a return type of void. For example:
+
+```c
+void main() {
+  // Program code here
+}
+```
+
 ### Builtin Functions
 
 * `void COLOR(uint16 color)` Sets the drawing color to the lower 8 bits of the given value.
@@ -283,6 +295,12 @@ void paint_rectangle(uint16 color,
 * Unary `!`, yields 1 if the operand is 0, or 0 otherwise.
 * Binary `&&`, yields 1 if the operands are both true, or 0 otherwise.
 * Binary `||`, yields 1 if at least one of the operands is true, or 0 otherwise.
+* Binary `<`, yields 1 if the first operand is less than the second. If one or both of the operands is a signed type, both of the operands will be treated as signed.
+* Binary `<=`, yields 1 if the first operand is less than or equal to the second. If one or both of the operands is a signed type, both of the oeprands will be treated as signed.
+* Binary `>`, yields 1 if the first operand is greater than the second. If one or both of the operands is a signed type, both of the oeprands will be treated as signed.
+* Binary `>=`, yields 1 if the first operand is greater than or equal to the second. If one or both of the operands is a signed type, both of the oeprands will be treated as signed.
+* Binary `==`, yields 1 if the bit patterns of the two operands are identical.
+* Binary `!=`, yields 1 if the bit patterns of the two operands differ.
 
 ### Addresses
 
