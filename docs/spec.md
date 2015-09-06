@@ -280,6 +280,7 @@ void main() {
 * Binary `-`, subtracts two numbers.
 * Binary `*`, multiplies two numbers.
 * Binary `/`, divides two numbers.
+* Binary `%`, gets the remainder of division between two numbers. `a = b % c;` is equivalent to `a = b - (c * (b / c));`.
 
 ### Bitwise
 
