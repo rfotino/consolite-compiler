@@ -20,7 +20,7 @@ games, which is what makes it a "console".
 
 ## Building and Dependencies
 
-This version of the assembler is written in C++, and uses only the standard
+This version of the compiler is written in C++, and uses only the standard
 library. To build the project just type `make`.
 
 ## Usage
