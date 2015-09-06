@@ -28,19 +28,13 @@ Consolite C currently has only two primitive data types, though I hope to expand
 
 ### Arrays
 
-Arrays in Consolite C must have a constant size that can be determined at compile time. For example:
+Arrays in Consolite C must have a constant size that can be determined at compile time. Arrays cannot be multi-dimensional. For example:
 
 ```c
 // Declares an array of initialized int16 values.
 int16[5] arr1 = { -2, -1, 0, 1, 2 };
 // Declares an array of uninitialized uint16 values.
 uint16[4] arr2;
-```
-
-Arrays can also be multi-dimensional, but the size of each dimension must be known at compile time. For example:
-
-```c
-uint16[2][3] arr4 = { { 0, 1 }, { 2, 3 }, { 4, 5 } };
 ```
 
 ### Pointers
