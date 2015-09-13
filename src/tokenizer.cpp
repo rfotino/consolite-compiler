@@ -11,29 +11,23 @@
 #include <unistd.h>
 #include "tokenizer.h"
 
-Tokenizer::Tokenizer(char *filename) : _offset(0), _error(false) {
+Tokenizer::Tokenizer(char *filename) : _offset(0) {
   int fd = open(filename, O_RDONLY);
   if (-1 == fd) {
-    _error = true;
-    _errorMsg = "Unable to open input file.";
-    return;
+    throw "Unable to open input file.";
   }
   _length = lseek(fd, 0, SEEK_END);
   if (-1 == _length) {
-    _error = true;
-    _errorMsg = "Unable to get input file length.";
     close(fd);
-    return;
+    throw "Unable to get input file length.";
   }
   // Length of memory we allocate with mmap() must be a multiple of
   // the page size.
   _mmapLength = ((_length / getpagesize()) + 1) * getpagesize();
   _data = static_cast<char *>(mmap(NULL, _mmapLength, PROT_READ, MAP_PRIVATE, fd, 0));
   if (MAP_FAILED == static_cast<void *>(_data)) {
-    _error = true;
-    _errorMsg = "Unable to map input file.";
     close(fd);
-    return;
+    throw "Unable to map input file.";
   }
   close(fd);
 }

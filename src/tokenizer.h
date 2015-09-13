@@ -13,16 +13,12 @@ class Tokenizer {
   Tokenizer(char *filename);
   ~Tokenizer();
   std::string getNext();
-  bool hasError() { return _error; }
-  std::string getError() { return _errorMsg; }
 
  private:
   int _offset;
   int _length;
   int _mmapLength;
   char *_data;
-  bool _error;
-  std::string _errorMsg;
 };
 
 #endif
