@@ -8,13 +8,23 @@
 
 #include <string>
 
+class Token {
+ public:
+  Token(const std::string& value, int lineNum)
+    : _value(value), _lineNum(lineNum) { }
+  std::string val() const { return _value; }
+  int line() const { return _lineNum; }
+ private:
+  std::string _value;
+  int _lineNum;
+};
+
 class Tokenizer {
  public:
   Tokenizer(char *filename);
   ~Tokenizer();
-  std::string getNext();
-  std::string peekNext();
-  int getLineNum() { return _lineNum; }
+  Token getNext();
+  Token peekNext();
 
  private:
   int _offset;

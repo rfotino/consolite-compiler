@@ -36,7 +36,7 @@ Tokenizer::~Tokenizer() {
   munmap(_data, _mmapLength);
 }
 
-std::string Tokenizer::getNext() {
+Token Tokenizer::getNext() {
   std::string token;
   bool singleComment = false;
   bool multiComment = false;
@@ -124,13 +124,13 @@ std::string Tokenizer::getNext() {
     }
     _offset++;
   }
-  return token;
+  return Token(token, _lineNum);
 }
 
-std::string Tokenizer::peekNext() {
+Token Tokenizer::peekNext() {
   int prevOffset = _offset;
   int prevLineNum = _lineNum;
-  std::string token = getNext();
+  Token token = getNext();
   _offset = prevOffset;
   _lineNum = prevLineNum;
   return token;

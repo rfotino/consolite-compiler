@@ -12,19 +12,9 @@
 #include <memory>
 #include "tokenizer.h"
 
-class SyntaxToken {
- private:
-  /**
-   * The line number where the token starts in the input file, used
-   * for helpful error reporting.
-   */
-  int _lineNum;
-};
-
-class GlobalVarToken : public SyntaxToken {
+class GlobalVarToken {
  public:
-  GlobalVarToken(const std::string& type, const std::string& name)
-    : _dataType(type), _varName(name) { }
+  GlobalVarToken(const Token& type, const Token& name);
   bool parse(Tokenizer *tokenizer,
              std::vector<std::shared_ptr<GlobalVarToken>> &globals);
  private:
@@ -33,20 +23,19 @@ class GlobalVarToken : public SyntaxToken {
   int _value;
 };
 
-class ParamToken : public SyntaxToken {
+class ParamToken {
  private:
   std::string _type;
   std::string _name;
 };
 
-class StatementToken : public SyntaxToken {
+class StatementToken {
 
 };
 
-class FunctionToken : public SyntaxToken {
+class FunctionToken {
  public:
-  FunctionToken(const std::string& type, const std::string& name)
-    : _returnType(type), _funcName(name) { }
+  FunctionToken(const Token& type, const Token& name);
   bool parse(Tokenizer *tokenizer,
              std::vector<std::shared_ptr<GlobalVarToken>> &globals);
  private:
@@ -56,24 +45,24 @@ class FunctionToken : public SyntaxToken {
   std::vector<StatementToken> _statements;
 };
 
-class ExpressionToken : public SyntaxToken {
+class ExpressionToken {
  public:
   bool isConst();
  private:
   std::stack<std::string> _symbols;
 };
 
-class ExpressionStatement : public StatementToken {
- private:
-  ExpressionToken _expression;
-};
-
-class LocalVarStatement : public StatementToken {
+class LocalVarToken {
  private:
   std::string _type;
   std::string _name;
   ExpressionToken _value;
   bool _hasValue;
+};
+
+class ExpressionStatement : public StatementToken {
+ private:
+  ExpressionToken _expression;
 };
 
 class NullStatement : public StatementToken {
