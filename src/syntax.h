@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 #include <stack>
+#include <memory>
+#include "tokenizer.h"
 
 class SyntaxToken {
  private:
@@ -20,13 +22,18 @@ class SyntaxToken {
 };
 
 class GlobalVarToken : public SyntaxToken {
+ public:
+  GlobalVarToken(const std::string& type, const std::string& name)
+    : _dataType(type), _varName(name) { }
+  bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
  private:
   std::string _dataType;
   std::string _varName;
   int _value;
 };
 
-class ParamToken : SyntaxToken {
+class ParamToken : public SyntaxToken {
  private:
   std::string _type;
   std::string _name;
@@ -37,6 +44,11 @@ class StatementToken : public SyntaxToken {
 };
 
 class FunctionToken : public SyntaxToken {
+ public:
+  FunctionToken(const std::string& type, const std::string& name)
+    : _returnType(type), _funcName(name) { }
+  bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
  private:
   std::string _returnType;
   std::string _funcName;

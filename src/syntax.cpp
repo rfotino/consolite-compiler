@@ -4,3 +4,17 @@
  */
 
 #include "syntax.h"
+
+bool GlobalVarToken::parse(Tokenizer *tokenizer,
+                           std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+  tokenizer = tokenizer;
+  globals = globals;
+  return true;
+}
+
+bool FunctionToken::parse(Tokenizer *tokenizer,
+                          std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+  tokenizer = tokenizer;
+  globals = globals;
+  return true;
+}

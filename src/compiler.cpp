@@ -22,7 +22,9 @@ int main(int argc, char **argv) {
     Tokenizer tokenizer(argv[1]);
     // Parses the tokens into an abstract syntax tree
     Parser parser(&tokenizer);
-    parser.parse();
+    if (!parser.parse()) {
+      return 1;
+    }
     // Compiles the syntax tree to the output file
     parser.output(argv[2]);
   } catch (char const *error) {
