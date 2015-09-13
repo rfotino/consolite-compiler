@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include "tokenizer.h"
 
-Tokenizer::Tokenizer(char *filename) : _offset(0) {
+Tokenizer::Tokenizer(char *filename) : _offset(0), _lineNum(1) {
   int fd = open(filename, O_RDONLY);
   if (-1 == fd) {
     throw "Unable to open input file.";
@@ -119,7 +119,19 @@ std::string Tokenizer::getNext() {
     } else {
       token += _data[_offset];
     }
+    if ('\n' == _data[_offset]) {
+      _lineNum++;
+    }
     _offset++;
   }
+  return token;
+}
+
+std::string Tokenizer::peekNext() {
+  int prevOffset = _offset;
+  int prevLineNum = _lineNum;
+  std::string token = getNext();
+  _offset = prevOffset;
+  _lineNum = prevLineNum;
   return token;
 }
