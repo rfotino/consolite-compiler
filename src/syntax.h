@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 #include <stack>
-#include <memory>
 #include "tokenizer.h"
 
 class GlobalVarToken;
@@ -18,8 +17,8 @@ class FunctionToken;
 class TypeToken {
  public:
   bool parse(Tokenizer *tokenizer,
-             std::vector<std::shared_ptr<FunctionToken>> &functions,
-             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+             std::vector<FunctionToken> &functions,
+             std::vector<GlobalVarToken> &globals);
   std::string name() const { return _name; }
   bool isArray() const { return _isArray; }
   int arraySize() const { return _arraySize; }
@@ -36,8 +35,8 @@ class GlobalVarToken {
   GlobalVarToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<std::shared_ptr<FunctionToken>> &functions,
-             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+             std::vector<FunctionToken> &functions,
+             std::vector<GlobalVarToken> &globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
  private:
@@ -62,8 +61,8 @@ class FunctionToken {
   FunctionToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<std::shared_ptr<FunctionToken>> &functions,
-             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+             std::vector<FunctionToken> &functions,
+             std::vector<GlobalVarToken> &globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
  private:
@@ -77,10 +76,10 @@ class ExprToken {
  public:
   ExprToken() : _const(true), _lineNum(-1) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<std::shared_ptr<FunctionToken>> &functions,
-             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+             std::vector<FunctionToken> &functions,
+             std::vector<GlobalVarToken> &globals);
   bool isConst() const { return _const; }
-  int constVal(std::vector<std::shared_ptr<GlobalVarToken>> &globals) const;
+  int constVal(std::vector<GlobalVarToken> &globals) const;
   int line() const { return _lineNum; }
  private:
   bool _const;
@@ -92,8 +91,8 @@ class ArrayExprToken {
  public:
   ArrayExprToken() : _lineNum(-1) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<std::shared_ptr<FunctionToken>> &functions,
-             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+             std::vector<FunctionToken> &functions,
+             std::vector<GlobalVarToken> &globals);
   int size() const { return _exprs.size(); }
   ExprToken get(int i) const { return _exprs[i]; }
   int line() const { return _lineNum; }

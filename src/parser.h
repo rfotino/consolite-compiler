@@ -6,7 +6,6 @@
 #ifndef CONSOLITE_COMPILER_PARSER_H
 #define CONSOLITE_COMPILER_PARSER_H
 
-#include <memory>
 #include <vector>
 #include "tokenizer.h"
 #include "syntax.h"
@@ -19,8 +18,8 @@ class Parser {
 
  private:
   Tokenizer *_tokenizer;
-  std::vector<std::shared_ptr<GlobalVarToken>> _globals;
-  std::vector<std::shared_ptr<FunctionToken>> _functions;
+  std::vector<GlobalVarToken> _globals;
+  std::vector<FunctionToken> _functions;
 };
 
 #endif

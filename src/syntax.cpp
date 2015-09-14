@@ -12,9 +12,9 @@ bool isValidName(const std::string& name) {
 }
 
 bool isFunctionName(const std::string& name,
-                    const std::vector<std::shared_ptr<FunctionToken>>& functions) {
+                    const std::vector<FunctionToken>& functions) {
   for (auto func : functions) {
-    if (func->name() == name) {
+    if (func.name() == name) {
       return true;
     }
   }
@@ -22,9 +22,9 @@ bool isFunctionName(const std::string& name,
 }
 
 bool isGlobalName(const std::string& name,
-                  const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
+                  const std::vector<GlobalVarToken>& globals) {
   for (auto global : globals) {
-    if (global->name() == name) {
+    if (global.name() == name) {
       return true;
     }
   }
@@ -36,8 +36,8 @@ bool isType(const std::string& type) {
 }
 
 bool TypeToken::parse(Tokenizer *tokenizer,
-                      std::vector<std::shared_ptr<FunctionToken>> &functions,
-                      std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+                      std::vector<FunctionToken> &functions,
+                      std::vector<GlobalVarToken> &globals) {
   Token typeName = tokenizer->getNext();
   if (!isType(typeName.val())) {
     std::cerr << "Error: Invalid type '" << typeName.val() << "' on line "
@@ -71,15 +71,15 @@ bool TypeToken::parse(Tokenizer *tokenizer,
 }
 
 bool ExprToken::parse(Tokenizer *tokenizer,
-                      std::vector<std::shared_ptr<FunctionToken>> &functions,
-                      std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+                      std::vector<FunctionToken> &functions,
+                      std::vector<GlobalVarToken> &globals) {
   tokenizer = tokenizer;
   functions = functions;
   globals = globals;
   return true;
 }
 
-int ExprToken::constVal(std::vector<std::shared_ptr<GlobalVarToken>> &globals) const {
+int ExprToken::constVal(std::vector<GlobalVarToken> &globals) const {
   if (!_const) {
     return 0;
   }
@@ -88,8 +88,8 @@ int ExprToken::constVal(std::vector<std::shared_ptr<GlobalVarToken>> &globals) c
 }
 
 bool ArrayExprToken::parse(Tokenizer *tokenizer,
-                           std::vector<std::shared_ptr<FunctionToken>> &functions,
-                           std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+                           std::vector<FunctionToken> &functions,
+                           std::vector<GlobalVarToken> &globals) {
   tokenizer = tokenizer;
   functions = functions;
   globals = globals;
@@ -97,8 +97,8 @@ bool ArrayExprToken::parse(Tokenizer *tokenizer,
 }
 
 bool GlobalVarToken::parse(Tokenizer *tokenizer,
-                           std::vector<std::shared_ptr<FunctionToken>> &functions,
-                           std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+                           std::vector<FunctionToken> &functions,
+                           std::vector<GlobalVarToken> &globals) {
   // Validate the type
   if ("void" == _type.name()) {
     std::cerr << "Error: Global var cannot be of type 'void' on line "
@@ -180,8 +180,8 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
 }
 
 bool FunctionToken::parse(Tokenizer *tokenizer,
-                          std::vector<std::shared_ptr<FunctionToken>> &functions,
-                          std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+                          std::vector<FunctionToken> &functions,
+                          std::vector<GlobalVarToken> &globals) {
   tokenizer = tokenizer;
   functions = functions;
   globals = globals;
