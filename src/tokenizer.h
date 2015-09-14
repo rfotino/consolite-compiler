@@ -10,6 +10,7 @@
 
 class Token {
  public:
+  Token() : _lineNum(-1) { }
   Token(const std::string& value, int lineNum)
     : _value(value), _lineNum(lineNum) { }
   std::string val() const { return _value; }
@@ -32,6 +33,8 @@ class Tokenizer {
   int _mmapLength;
   char *_data;
   int _lineNum;
+  bool _hasNext;
+  Token _next;
 };
 
 #endif

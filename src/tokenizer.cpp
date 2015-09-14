@@ -11,7 +11,8 @@
 #include <unistd.h>
 #include "tokenizer.h"
 
-Tokenizer::Tokenizer(char *filename) : _offset(0), _lineNum(1) {
+Tokenizer::Tokenizer(char *filename) : _offset(0), _lineNum(1),
+                                       _hasNext(false) {
   int fd = open(filename, O_RDONLY);
   if (-1 == fd) {
     throw "Unable to open input file.";
@@ -37,6 +38,12 @@ Tokenizer::~Tokenizer() {
 }
 
 Token Tokenizer::getNext() {
+  // If we have already peeked at this token, we can return
+  // it directly.
+  if (_hasNext) {
+    _hasNext = false;
+    return _next;
+  }
   std::string token;
   bool singleComment = false;
   bool multiComment = false;
@@ -128,10 +135,7 @@ Token Tokenizer::getNext() {
 }
 
 Token Tokenizer::peekNext() {
-  int prevOffset = _offset;
-  int prevLineNum = _lineNum;
-  Token token = getNext();
-  _offset = prevOffset;
-  _lineNum = prevLineNum;
-  return token;
+  _next = getNext();
+  _hasNext = true;
+  return _next;
 }
