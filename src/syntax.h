@@ -12,14 +12,48 @@
 #include <memory>
 #include "tokenizer.h"
 
+class GlobalVarToken;
+class FunctionToken;
+
+class TypeToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<FunctionToken>> &functions,
+             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+  std::string name() const { return _name; }
+  bool isArray() const { return _isArray; }
+  int arraySize() const { return _arraySize; }
+  int line() const { return _lineNum; }
+ private:
+  std::string _name;
+  bool _isArray;
+  int _arraySize;
+  int _lineNum;
+};
+
+class NameToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<FunctionToken>> &functions,
+             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+  std::string val() const { return _name; }
+  int line() const { return _lineNum; }
+ private:
+  std::string _name;
+  int _lineNum;
+};
+
 class GlobalVarToken {
  public:
-  GlobalVarToken(const Token& type, const Token& name);
+  GlobalVarToken(const TypeToken& type, const NameToken& name)
+    : _type(type), _name(name.val()) { }
   bool parse(Tokenizer *tokenizer,
              std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+  TypeToken type() const { return _type; }
+  std::string name() const { return _name; }
  private:
-  std::string _dataType;
-  std::string _varName;
+  TypeToken _type;
+  std::string _name;
   int _value;
 };
 
@@ -35,20 +69,32 @@ class StatementToken {
 
 class FunctionToken {
  public:
-  FunctionToken(const Token& type, const Token& name);
+  FunctionToken(const TypeToken& type, const NameToken& name)
+    : _type(type), _name(name.val()) { }
   bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<FunctionToken>> &functions,
              std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+  TypeToken type() const { return _type; }
+  std::string name() const { return _name; }
  private:
-  std::string _returnType;
-  std::string _funcName;
+  TypeToken _type;
+  std::string _name;
   std::vector<ParamToken> _parameters;
   std::vector<StatementToken> _statements;
 };
 
-class ExpressionToken {
+class ExprToken {
  public:
-  bool isConst();
+  ExprToken() : _const(true), _lineNum(-1) { }
+  bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<FunctionToken>> &functions,
+             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+  bool isConst() const { return _const; }
+  int constVal(std::vector<std::shared_ptr<GlobalVarToken>> &globals) const;
+  int line() const { return _lineNum; }
  private:
+  bool _const;
+  int _lineNum;
   std::stack<std::string> _symbols;
 };
 
@@ -56,13 +102,13 @@ class LocalVarToken {
  private:
   std::string _type;
   std::string _name;
-  ExpressionToken _value;
+  ExprToken _value;
   bool _hasValue;
 };
 
-class ExpressionStatement : public StatementToken {
+class ExprStatement : public StatementToken {
  private:
-  ExpressionToken _expression;
+  ExprToken _expr;
 };
 
 class NullStatement : public StatementToken {
@@ -76,7 +122,7 @@ class CompoundStatement : public StatementToken {
 
 class IfStatement : public StatementToken {
  private:
-  ExpressionToken _condExpression;
+  ExprToken _condExpr;
   StatementToken _trueStatement;
   StatementToken _falseStatement;
   bool _hasElse;
@@ -84,14 +130,14 @@ class IfStatement : public StatementToken {
 
 class LoopStatement : public StatementToken {
  private:
-  ExpressionToken _condExpression;
+  ExprToken _condExpr;
   StatementToken _body;
 };
 
 class ForStatement : public LoopStatement {
  private:
-  ExpressionToken _initExpression;
-  ExpressionToken _loopExpression;
+  ExprToken _initExpr;
+  ExprToken _loopExpr;
 };
 
 class WhileStatement : public LoopStatement {
@@ -112,7 +158,7 @@ class ContinueStatement : public StatementToken {
 
 class ReturnStatement : public StatementToken {
  private:
-  ExpressionToken _returnValue;
+  ExprToken _returnValue;
   bool _hasValue;
 };
 
