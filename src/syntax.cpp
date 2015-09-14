@@ -90,9 +90,44 @@ int ExprToken::constVal(std::vector<GlobalVarToken> &globals) const {
 bool ArrayExprToken::parse(Tokenizer *tokenizer,
                            std::vector<FunctionToken> &functions,
                            std::vector<GlobalVarToken> &globals) {
-  tokenizer = tokenizer;
-  functions = functions;
-  globals = globals;
+  // Make sure the first token is a '{' symbol
+  Token first = tokenizer->getNext();
+  if (first.val().empty()) {
+    std::cerr << "Error: Unexpected EOF on line " << first.line()
+              << "." << std::endl;
+    return false;
+  } else if ("{" != first.val()) {
+    std::cerr << "Error: Unexpected token '" << first.val() << "', expected "
+              << "'{' on line " << first.line() << "." << std::endl;
+    return false;
+  }
+  _lineNum = first.line();
+  // Check if the next token is a closing brace, in which
+  // case we don't need to check for expressions.
+  if ("}" == tokenizer->peekNext().val()) {
+    tokenizer->getNext();
+    return true;
+  }
+  // Get any expressions we find, separated by commas
+  while (true) {
+    ExprToken expr;
+    if (!expr.parse(tokenizer, functions, globals)) {
+      return false;
+    }
+    _exprs.push_back(expr);
+    Token next = tokenizer->getNext();
+    if ("}" == next.val()) {
+      break;
+    } else if (next.val().empty()) {
+      std::cerr << "Error: Unexpected EOF on line " << next.line()
+                << "." << std::endl;
+      return false;
+    } else if ("," != next.val()) {
+      std::cerr << "Error: Unexpected token '" << next.val() << "' on line "
+                << next.line() << "." << std::endl;
+      return false;
+    }
+  }
   return true;
 }
 
