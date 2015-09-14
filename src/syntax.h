@@ -31,22 +31,10 @@ class TypeToken {
   int _lineNum;
 };
 
-class NameToken {
- public:
-  bool parse(Tokenizer *tokenizer,
-             std::vector<std::shared_ptr<FunctionToken>> &functions,
-             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
-  std::string val() const { return _name; }
-  int line() const { return _lineNum; }
- private:
-  std::string _name;
-  int _lineNum;
-};
-
 class GlobalVarToken {
  public:
-  GlobalVarToken(const TypeToken& type, const NameToken& name)
-    : _type(type), _name(name.val()) { }
+  GlobalVarToken(const TypeToken& type, const std::string& name)
+    : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
              std::vector<std::shared_ptr<GlobalVarToken>> &globals);
   TypeToken type() const { return _type; }
@@ -69,8 +57,8 @@ class StatementToken {
 
 class FunctionToken {
  public:
-  FunctionToken(const TypeToken& type, const NameToken& name)
-    : _type(type), _name(name.val()) { }
+  FunctionToken(const TypeToken& type, const std::string& name)
+    : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
              std::vector<std::shared_ptr<FunctionToken>> &functions,
              std::vector<std::shared_ptr<GlobalVarToken>> &globals);

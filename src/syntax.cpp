@@ -4,10 +4,15 @@
  */
 
 #include <iostream>
+#include <regex>
 #include "syntax.h"
 
+bool isValidName(std::string name) {
+  return std::regex_match(name, std::regex("^[_a-zA-Z][_a-zA-Z0-9]*$"));
+}
+
 bool isType(std::string type) {
-  return "int16" == type || "uint16" == type;
+  return "void" == type || "int16" == type || "uint16" == type;
 }
 
 bool TypeToken::parse(Tokenizer *tokenizer,
@@ -42,15 +47,6 @@ bool TypeToken::parse(Tokenizer *tokenizer,
       return false;
     }
   }
-  return true;
-}
-
-bool NameToken::parse(Tokenizer *tokenizer,
-                      std::vector<std::shared_ptr<FunctionToken>> &functions,
-                      std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
-  tokenizer = tokenizer;
-  functions = functions;
-  globals = globals;
   return true;
 }
 
