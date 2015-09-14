@@ -39,7 +39,7 @@ bool Parser::parse() {
       _functions.push_back(func);
     } else {
       std::shared_ptr<GlobalVarToken> var(new GlobalVarToken(type, name.val()));
-      if (!var->parse(_tokenizer, _globals)) {
+      if (!var->parse(_tokenizer, _functions, _globals)) {
         error = true;
         break;
       }

@@ -36,6 +36,7 @@ class GlobalVarToken {
   GlobalVarToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<FunctionToken>> &functions,
              std::vector<std::shared_ptr<GlobalVarToken>> &globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
@@ -43,6 +44,7 @@ class GlobalVarToken {
   TypeToken _type;
   std::string _name;
   int _value;
+  std::vector<int> _arrayValues;
 };
 
 class ParamToken {
@@ -84,6 +86,20 @@ class ExprToken {
   bool _const;
   int _lineNum;
   std::stack<std::string> _symbols;
+};
+
+class ArrayExprToken {
+ public:
+  ArrayExprToken() : _lineNum(-1) { }
+  bool parse(Tokenizer *tokenizer,
+             std::vector<std::shared_ptr<FunctionToken>> &functions,
+             std::vector<std::shared_ptr<GlobalVarToken>> &globals);
+  int size() const { return _exprs.size(); }
+  ExprToken get(int i) const { return _exprs[i]; }
+  int line() const { return _lineNum; }
+ private:
+  std::vector<ExprToken> _exprs;
+  int _lineNum;
 };
 
 class LocalVarToken {
