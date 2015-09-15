@@ -11,8 +11,14 @@
 #include <memory>
 #include <stack>
 
+// Forward declaration, some tokens take a pointer to a tokenizer as an
+// argument to parse().
 class Tokenizer;
 
+/**
+ * The base class for all syntax tokens, has a line number and an
+ * overridable function for getting the "value" of this token.
+ */
 class Token {
  public:
   Token() : _lineNum(-1) { }
@@ -22,6 +28,10 @@ class Token {
   int _lineNum;
 };
 
+/**
+ * The type of token returned by the tokenizer, could be a symbol,
+ * a name, an operator, etc, represented by an undifferentiated string.
+ */
 class AtomToken : public Token {
  public:
   AtomToken() { }
@@ -36,6 +46,9 @@ class AtomToken : public Token {
 class GlobalVarToken;
 class FunctionToken;
 
+/**
+ * A token representing a literal value from the code like "0x1234" or "4321".
+ */
 class LiteralToken : public Token {
  public:
   LiteralToken() : _value(0) { }
@@ -45,6 +58,11 @@ class LiteralToken : public Token {
   int _value;
 };
 
+/**
+ * A token representing a type. This could have been constructed from
+ * a single token like "uint16" or from several like "uint16", "[", "3", "]"
+ * if it is an array type,
+ */
 class TypeToken : public Token {
  public:
   TypeToken() : _isArray(false), _arraySize(-1) { }
@@ -60,6 +78,12 @@ class TypeToken : public Token {
   int _arraySize;
 };
 
+/**
+ * A token representing a global variable. This includes the name, type,
+ * and initial value of the global. The parse() function is for parsing
+ * declarations like "uint16[3] glob = { 1, 2, 3 };" when we are in
+ * the global scope.
+ */
 class GlobalVarToken : public Token {
  public:
   GlobalVarToken(const TypeToken& type, const std::string& name)
@@ -87,6 +111,11 @@ class StatementToken : public Token {
 
 };
 
+/**
+ * A token representing a function definition. Has a return type,
+ * a list of parameters, and a list of top-level statements. The parse()
+ * function separates the parameters and statements into their own tokens.
+ */
 class FunctionToken : public Token {
  public:
   FunctionToken(const TypeToken& type, const std::string& name)
@@ -103,6 +132,11 @@ class FunctionToken : public Token {
   std::vector<StatementToken> _statements;
 };
 
+/**
+ * A token representing an expression like "(a+b)*(c-d)". It parses out an
+ * expression tree of operators, literals, variables, and function calls
+ * that can be checked for const-ness and evaluated.
+ */
 class ExprToken : public Token {
  public:
   ExprToken() : _const(true) { }
@@ -116,6 +150,10 @@ class ExprToken : public Token {
   std::shared_ptr<Token> _root;
 };
 
+/**
+ * A token representing an array of expressions separated by commas within
+ * braces. Looks like "{1, 2, 3}", where 1, 2, and 3 are expression tokens.
+ */
 class ArrayExprToken : public Token {
  public:
   bool parse(Tokenizer *tokenizer,

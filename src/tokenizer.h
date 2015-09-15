@@ -11,9 +11,20 @@
 
 class Tokenizer {
  public:
+  /**
+   * Opens the given file and mmaps it to an internal pointer for easy
+   * traversal. Throws an exception on failure.
+   */
   Tokenizer(char *filename);
   ~Tokenizer();
+  /**
+   * Consumes the next token and returns it.
+   */
   AtomToken getNext();
+  /**
+   * Returns the next token without consuming it. Subsequent calls to
+   * getNext() or peekNext() will return the same token.
+   */
   AtomToken peekNext();
 
  private:
