@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <regex>
+#include "tokenizer.h"
 #include "syntax.h"
 
 bool isValidName(const std::string& name) {
@@ -35,18 +36,42 @@ bool isType(const std::string& type) {
   return "void" == type || "int16" == type || "uint16" == type;
 }
 
+bool LiteralToken::parse(const AtomToken& token) {
+  _lineNum = token.line();
+  if (std::regex_match(token.str(), std::regex("^0[xX][0-9a-fA-F]+$"))) {
+    _value = 0;
+    for (size_t i = 2; i < token.str().size(); i++) {
+      char c = token.str().at(i);
+      uint8_t hexVal =
+        ('0' <= c && c <= '9') ? (c - '0') :
+        ('a' <= c && c <= 'f') ? (c - 'a' + 10) : (c - 'A' + 10);
+      _value = (_value * 16) + hexVal;
+    }
+  } else if (std::regex_match(token.str(), std::regex("^[0-9]+$"))) {
+    _value = 0;
+    for (size_t i = 0; i < token.str().size(); i++) {
+      char c = token.str().at(i);
+      uint8_t decVal = c - '0';
+      _value = (_value * 10) + decVal;
+    }
+  } else {
+    return false;
+  }
+  return true;
+}
+
 bool TypeToken::parse(Tokenizer *tokenizer,
                       std::vector<FunctionToken> &functions,
                       std::vector<GlobalVarToken> &globals) {
-  Token typeName = tokenizer->getNext();
-  if (!isType(typeName.val())) {
-    std::cerr << "Error: Invalid type '" << typeName.val() << "' on line "
+  AtomToken typeName = tokenizer->getNext();
+  if (!isType(typeName.str())) {
+    std::cerr << "Error: Invalid type '" << typeName.str() << "' on line "
               << typeName.line() << "." << std::endl;
     return false;
   }
   _lineNum = typeName.line();
-  _name = typeName.val();
-  if ("[" == tokenizer->peekNext().val()) {
+  _name = typeName.str();
+  if ("[" == tokenizer->peekNext().str()) {
     tokenizer->getNext();
     _isArray = true;
     ExprToken expr;
@@ -58,10 +83,10 @@ bool TypeToken::parse(Tokenizer *tokenizer,
                 << expr.line() << "." << std::endl;
       return false;
     }
-    _arraySize = expr.constVal(globals);
-    Token endBracket = tokenizer->getNext();
-    if ("]" != endBracket.val()) {
-      std::cerr << "Error: Unexpected token '" << endBracket.val()
+    _arraySize = expr.val();
+    AtomToken endBracket = tokenizer->getNext();
+    if ("]" != endBracket.str()) {
+      std::cerr << "Error: Unexpected token '" << endBracket.str()
                 << "', expected ']' on line " << endBracket.line()
                 << "." << std::endl;
       return false;
@@ -73,38 +98,50 @@ bool TypeToken::parse(Tokenizer *tokenizer,
 bool ExprToken::parse(Tokenizer *tokenizer,
                       std::vector<FunctionToken> &functions,
                       std::vector<GlobalVarToken> &globals) {
-  tokenizer = tokenizer;
   functions = functions;
   globals = globals;
-  return true;
-}
-
-int ExprToken::constVal(std::vector<GlobalVarToken> &globals) const {
-  if (!_const) {
-    return 0;
+  while (true) {
+    AtomToken t = tokenizer->peekNext();
+    std::shared_ptr<LiteralToken> literal(new LiteralToken());
+    if ("(" == t.str() || ")" == t.str()) {
+      std::cerr << "Error: Parentheses not implemented yet on line "
+                << t.line() << "." << std::endl;
+      return false;
+    } else if (literal->parse(t)) {
+      _root = literal;
+      tokenizer->getNext();
+      return true;
+    } else if (isValidName(t.str())) {
+      std::cerr << "Error: Names not implemented yet on line "
+                << t.line() << ", name = '" << t.str() << "'." << std::endl;
+      return false;
+    } else {
+      std::cerr << "Error: Unexpected token '" << t.str()
+                << "' found on line " << t.line() << "." << std::endl;
+      return false;
+    }
   }
-  globals = globals;
-  return 0;
+  return true;
 }
 
 bool ArrayExprToken::parse(Tokenizer *tokenizer,
                            std::vector<FunctionToken> &functions,
                            std::vector<GlobalVarToken> &globals) {
   // Make sure the first token is a '{' symbol
-  Token first = tokenizer->getNext();
-  if (first.val().empty()) {
+  AtomToken first = tokenizer->getNext();
+  if (first.empty()) {
     std::cerr << "Error: Unexpected EOF on line " << first.line()
               << "." << std::endl;
     return false;
-  } else if ("{" != first.val()) {
-    std::cerr << "Error: Unexpected token '" << first.val() << "', expected "
+  } else if ("{" != first.str()) {
+    std::cerr << "Error: Unexpected token '" << first.str() << "', expected "
               << "'{' on line " << first.line() << "." << std::endl;
     return false;
   }
   _lineNum = first.line();
   // Check if the next token is a closing brace, in which
   // case we don't need to check for expressions.
-  if ("}" == tokenizer->peekNext().val()) {
+  if ("}" == tokenizer->peekNext().str()) {
     tokenizer->getNext();
     return true;
   }
@@ -115,15 +152,15 @@ bool ArrayExprToken::parse(Tokenizer *tokenizer,
       return false;
     }
     _exprs.push_back(expr);
-    Token next = tokenizer->getNext();
-    if ("}" == next.val()) {
+    AtomToken next = tokenizer->getNext();
+    if ("}" == next.str()) {
       break;
-    } else if (next.val().empty()) {
+    } else if (next.empty()) {
       std::cerr << "Error: Unexpected EOF on line " << next.line()
                 << "." << std::endl;
       return false;
-    } else if ("," != next.val()) {
-      std::cerr << "Error: Unexpected token '" << next.val() << "' on line "
+    } else if ("," != next.str()) {
+      std::cerr << "Error: Unexpected token '" << next.str() << "' on line "
                 << next.line() << "." << std::endl;
       return false;
     }
@@ -155,9 +192,9 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
     return false;
   }
   // Validate the value (if set)
-  Token next = tokenizer->getNext();
-  Token last = next;
-  if ("=" == next.val()) {
+  AtomToken next = tokenizer->getNext();
+  AtomToken last = next;
+  if ("=" == next.str()) {
     if (_type.isArray()) {
       // Make sure array expression has as many values as the type
       // requires, and make sure they are all constant.
@@ -176,7 +213,7 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
                     << expr.line() << "." << std::endl;
           return false;
         }
-        _arrayValues.push_back(expr.constVal(globals));
+        _arrayValues.push_back(expr.val());
       }
     } else {
       // Not an array value, get the singleton initialization expression
@@ -188,11 +225,11 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
                   << expr.line() << "." << std::endl;
         return false;
       }
-      _value = expr.constVal(globals);
+      _value = expr.val();
     }
     // This should be a semicolon
     last = tokenizer->getNext();
-  } else if (";" == next.val()) {
+  } else if (";" == next.str()) {
     // No value supplied, give default value of 0.
     if (_type.isArray()) {
       for (int i = 0; i < _type.arraySize(); i++) {
@@ -202,12 +239,12 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
       _value = 0;
     }
   }
-  if (last.val().empty()) {
+  if (last.empty()) {
     std::cerr << "Error: Unexpected EOF on line " << last.line()
               << "." << std::endl;
     return false;
-  } else if (";" != last.val()) {
-    std::cerr << "Error: Unexpected token '" << last.val() << "', expected ';' "
+  } else if (";" != last.str()) {
+    std::cerr << "Error: Unexpected token '" << last.str() << "', expected ';' "
               << "on line " << last.line() << "." << std::endl;
     return false;
   }

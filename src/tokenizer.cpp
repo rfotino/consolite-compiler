@@ -37,7 +37,7 @@ Tokenizer::~Tokenizer() {
   munmap(_data, _mmapLength);
 }
 
-Token Tokenizer::getNext() {
+AtomToken Tokenizer::getNext() {
   // If we have already peeked at this token, we can return
   // it directly.
   if (_hasNext) {
@@ -131,10 +131,10 @@ Token Tokenizer::getNext() {
     }
     _offset++;
   }
-  return Token(token, _lineNum);
+  return AtomToken(token, _lineNum);
 }
 
-Token Tokenizer::peekNext() {
+AtomToken Tokenizer::peekNext() {
   _next = getNext();
   _hasNext = true;
   return _next;

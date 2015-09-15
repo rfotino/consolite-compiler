@@ -8,30 +8,59 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 #include <stack>
-#include "tokenizer.h"
+
+class Tokenizer;
+
+class Token {
+ public:
+  Token() : _lineNum(-1) { }
+  int line() const { return _lineNum; }
+  virtual int val() const { return 0; }
+ protected:
+  int _lineNum;
+};
+
+class AtomToken : public Token {
+ public:
+  AtomToken() { }
+  AtomToken(const std::string& strVal, int lineNum)
+    : _str(strVal) { _lineNum = lineNum; }
+  std::string str() const { return _str; }
+  bool empty() const { return _str.empty(); }
+ private:
+  std::string _str;
+};
 
 class GlobalVarToken;
 class FunctionToken;
 
-class TypeToken {
+class LiteralToken : public Token {
  public:
-  TypeToken() : _isArray(false), _arraySize(-1), _lineNum(-1) { }
+  LiteralToken() : _value(0) { }
+  bool parse(const AtomToken& token);
+  int val() const { return _value; }
+ private:
+  int _value;
+};
+
+class TypeToken : public Token {
+ public:
+  TypeToken() : _isArray(false), _arraySize(-1) { }
   bool parse(Tokenizer *tokenizer,
              std::vector<FunctionToken> &functions,
              std::vector<GlobalVarToken> &globals);
   std::string name() const { return _name; }
   bool isArray() const { return _isArray; }
   int arraySize() const { return _arraySize; }
-  int line() const { return _lineNum; }
  private:
   std::string _name;
   bool _isArray;
   int _arraySize;
-  int _lineNum;
 };
 
-class GlobalVarToken {
+class GlobalVarToken : public Token {
  public:
   GlobalVarToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
@@ -40,6 +69,7 @@ class GlobalVarToken {
              std::vector<GlobalVarToken> &globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
+  int val() const { return _value; }
  private:
   TypeToken _type;
   std::string _name;
@@ -47,17 +77,17 @@ class GlobalVarToken {
   std::vector<int> _arrayValues;
 };
 
-class ParamToken {
+class ParamToken : public Token {
  private:
   std::string _type;
   std::string _name;
 };
 
-class StatementToken {
+class StatementToken : public Token {
 
 };
 
-class FunctionToken {
+class FunctionToken : public Token {
  public:
   FunctionToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
@@ -73,36 +103,31 @@ class FunctionToken {
   std::vector<StatementToken> _statements;
 };
 
-class ExprToken {
+class ExprToken : public Token {
  public:
-  ExprToken() : _const(true), _lineNum(-1) { }
+  ExprToken() : _const(true) { }
   bool parse(Tokenizer *tokenizer,
              std::vector<FunctionToken> &functions,
              std::vector<GlobalVarToken> &globals);
   bool isConst() const { return _const; }
-  int constVal(std::vector<GlobalVarToken> &globals) const;
-  int line() const { return _lineNum; }
+  int val() const { return _root ? _root->val() : 0; }
  private:
   bool _const;
-  int _lineNum;
-  std::stack<std::string> _symbols;
+  std::shared_ptr<Token> _root;
 };
 
-class ArrayExprToken {
+class ArrayExprToken : public Token {
  public:
-  ArrayExprToken() : _lineNum(-1) { }
   bool parse(Tokenizer *tokenizer,
              std::vector<FunctionToken> &functions,
              std::vector<GlobalVarToken> &globals);
   int size() const { return _exprs.size(); }
   ExprToken get(int i) const { return _exprs[i]; }
-  int line() const { return _lineNum; }
  private:
   std::vector<ExprToken> _exprs;
-  int _lineNum;
 };
 
-class LocalVarToken {
+class LocalVarToken : public Token {
  private:
   std::string _type;
   std::string _name;

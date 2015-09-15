@@ -8,7 +8,6 @@
 
 #include <vector>
 #include "tokenizer.h"
-#include "syntax.h"
 
 class Parser {
  public:

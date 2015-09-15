@@ -4,7 +4,6 @@
  */
 
 #include <iostream>
-#include "tokenizer.h"
 #include "parser.h"
 
 void usage(char *program_name) {
