@@ -16,6 +16,7 @@ class FunctionToken;
 
 class TypeToken {
  public:
+  TypeToken() : _isArray(false), _arraySize(-1), _lineNum(-1) { }
   bool parse(Tokenizer *tokenizer,
              std::vector<FunctionToken> &functions,
              std::vector<GlobalVarToken> &globals);
