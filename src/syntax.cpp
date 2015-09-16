@@ -8,6 +8,23 @@
 #include "tokenizer.h"
 #include "syntax.h"
 
+std::string otherParen(const std::string& paren) {
+  if ("(" == paren) {
+    return ")";
+  } else if (")" == paren) {
+    return "(";
+  } else if ("[" == paren) {
+    return "]";
+  } else if ("]" == paren) {
+    return "[";
+  } else if ("{" == paren) {
+    return "}";
+  } else if ("}" == paren) {
+    return "{";
+  }
+  return "";
+}
+
 bool isValidName(const std::string& name) {
   return std::regex_match(name, std::regex("^[_a-zA-Z][_a-zA-Z0-9]*$"));
 }
@@ -64,7 +81,7 @@ bool OperatorToken::parse(const AtomToken& token) {
   static std::vector<std::string> validOps = { "+", "-", "*", "/", "%", "=",
                                                "&", "|", "^", "~", "!", "||",
                                                "&&", "<", "<=", ">", ">=",
-                                               "==", "!=" };
+                                               "==", "!=", "[" };
   _lineNum = token.line();
   for (auto op : validOps) {
     if (token.str() == op) {
@@ -78,7 +95,8 @@ bool OperatorToken::parse(const AtomToken& token) {
 bool OperatorToken::maybeBinary() {
   static std::vector<std::string> validOps = { "+", "-", "*", "/", "%", "=",
                                                "&", "|", "^", "||", "&&", "<",
-                                               "<=", ">", ">=", "==", "!=" };
+                                               "<=", ">", ">=", "==", "!=",
+                                               "["  };
   for (auto op : validOps) {
     if (_op == op) {
       return true;
@@ -139,7 +157,7 @@ bool ExprToken::parse(Tokenizer *tokenizer,
   globals = globals;
 
   std::string prev;
-  int parenDepth = 0;
+  std::stack<std::string> parens;
   while (true) {
     AtomToken t = tokenizer->peekNext();
     std::shared_ptr<LiteralToken> literal(new LiteralToken());
@@ -150,18 +168,19 @@ bool ExprToken::parse(Tokenizer *tokenizer,
                   << "' in expression on line " << t.line() << "." << std::endl;
         return false;
       }
-      prev = "(";
-      parenDepth++;
-    } else if (")" == t.str()) {
-      if (")" != prev && "val" != prev) {
+      prev = t.str();
+      parens.push(t.str());
+    } else if (")" == t.str() || "]" == t.str()) {
+      if ((!parens.empty() && otherParen(t.str()) != parens.top()) ||
+          (")" != prev && "val" != prev)) {
         std::cerr << "Error: Unexpected token '" << t.str()
                   << "' in expression on line " << t.line() << "." << std::endl;
         return false;
-      } else if (0 == parenDepth) {
+      } else if (parens.empty()) {
         break;
       }
       prev = ")";
-      parenDepth--;
+      parens.pop();
     } else if (literal->parse(t)) {
       if (!prev.empty() && "(" != prev && "op" != prev) {
         std::cerr << "Error: Unexpected token '" << t.str()
@@ -171,6 +190,11 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       prev = "val";
       _root = literal;
     } else if (op->parse(t)) {
+      // If it's an open square bracket, add to parentheses stack.
+      if ("[" == t.str()) {
+        parens.push(t.str());
+      }
+      // Determine if the operator is binary or unary.
       if (op->maybeBinary() && (")" == prev || "val" == prev)) {
         op->setBinary();
         // TODO: handle binary operators here
@@ -189,14 +213,14 @@ bool ExprToken::parse(Tokenizer *tokenizer,
                 << t.line() << ", name = '" << t.str() << "'." << std::endl;
       return false;
     } else if (t.str().empty()) {
-      if (0 != parenDepth || (")" != prev && "val" != prev)) {
+      if (!parens.empty() || (")" != prev && "val" != prev)) {
         std::cerr << "Error: Unexpected EOF in expression on line "
                   << t.line() << "." << std::endl;
         return false;
       }
       break;
     } else {
-      if (0 != parenDepth || (")" != prev && "val" != prev)) {
+      if (!parens.empty() || (")" != prev && "val" != prev)) {
         std::cerr << "Error: Unexpected token '" << t.str()
                   << "' in expression on line " << t.line() << "." << std::endl;
         return false;
