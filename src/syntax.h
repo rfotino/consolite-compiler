@@ -59,6 +59,48 @@ class LiteralToken : public Token {
 };
 
 /**
+ * A token representing a binary or unary operator in an expression, like
+ * "+", "==", or "!".
+ */
+class OperatorToken : public Token {
+ public:
+  /**
+   * Returns true if the token is a valid operator.
+   */
+  bool parse(const AtomToken& token);
+  /**
+   * Returns true if the token could be a binary operator. Some tokens like
+   * "-", "&", and "*" can represent either unary or binary operations.
+   */
+  bool maybeBinary();
+  /**
+   * Returns true if the token could be a unary operator.
+   */
+  bool maybeUnary();
+  /**
+   * Sets the token to be a binary operator. This can be used after context
+   * has been established so we know whether ambiguous operators are binary
+   * or unary.
+   */
+  void setBinary() { _binary = true; }
+  /**
+   * Sets the token to be a unary operator.
+   */
+  void setUnary() { _binary = false; }
+  /**
+   * Returns true if the operator has been set to binary with setBinary().
+   */
+  bool isBinary() { return _binary; }
+  /**
+   * Returns true if the operator has been set to unary with setUnary().
+   */
+  bool isUnary() { return !_binary; }
+ private:
+  std::string _op;
+  bool _binary;
+};
+
+/**
  * A token representing a type. This could have been constructed from
  * a single token like "uint16" or from several like "uint16", "[", "3", "]"
  * if it is an array type,

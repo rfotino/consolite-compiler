@@ -60,6 +60,43 @@ bool LiteralToken::parse(const AtomToken& token) {
   return true;
 }
 
+bool OperatorToken::parse(const AtomToken& token) {
+  static std::vector<std::string> validOps = { "+", "-", "*", "/", "%", "=",
+                                               "&", "|", "^", "~", "!", "||",
+                                               "&&", "<", "<=", ">", ">=",
+                                               "==", "!=" };
+  _lineNum = token.line();
+  for (auto op : validOps) {
+    if (token.str() == op) {
+      _op = op;
+      return true;
+    }
+  }
+  return false;
+}
+
+bool OperatorToken::maybeBinary() {
+  static std::vector<std::string> validOps = { "+", "-", "*", "/", "%", "=",
+                                               "&", "|", "^", "||", "&&", "<",
+                                               "<=", ">", ">=", "==", "!=" };
+  for (auto op : validOps) {
+    if (_op == op) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool OperatorToken::maybeUnary() {
+  static std::vector<std::string> validOps = { "-", "*", "&", "~", "!" };
+  for (auto op : validOps) {
+    if (_op == op) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool TypeToken::parse(Tokenizer *tokenizer,
                       std::vector<FunctionToken> &functions,
                       std::vector<GlobalVarToken> &globals) {
@@ -100,26 +137,74 @@ bool ExprToken::parse(Tokenizer *tokenizer,
                       std::vector<GlobalVarToken> &globals) {
   functions = functions;
   globals = globals;
+
+  std::string prev;
+  int parenDepth = 0;
   while (true) {
     AtomToken t = tokenizer->peekNext();
     std::shared_ptr<LiteralToken> literal(new LiteralToken());
-    if ("(" == t.str() || ")" == t.str()) {
-      std::cerr << "Error: Parentheses not implemented yet on line "
-                << t.line() << "." << std::endl;
-      return false;
+    std::shared_ptr<OperatorToken> op(new OperatorToken());
+    if ("(" == t.str()) {
+      if (!prev.empty() && "(" != prev && "op" != prev) {
+        std::cerr << "Error: Unexpected token '" << t.str()
+                  << "' in expression on line " << t.line() << "." << std::endl;
+        return false;
+      }
+      prev = "(";
+      parenDepth++;
+    } else if (")" == t.str()) {
+      if (")" != prev && "val" != prev) {
+        std::cerr << "Error: Unexpected token '" << t.str()
+                  << "' in expression on line " << t.line() << "." << std::endl;
+        return false;
+      } else if (0 == parenDepth) {
+        break;
+      }
+      prev = ")";
+      parenDepth--;
     } else if (literal->parse(t)) {
+      if (!prev.empty() && "(" != prev && "op" != prev) {
+        std::cerr << "Error: Unexpected token '" << t.str()
+                  << "' in expression on line " << t.line() << "." << std::endl;
+        return false;
+      }
+      prev = "val";
       _root = literal;
-      tokenizer->getNext();
-      return true;
+    } else if (op->parse(t)) {
+      if (op->maybeBinary() && (")" == prev || "val" == prev)) {
+        op->setBinary();
+        // TODO: handle binary operators here
+      } else if (op->maybeUnary() && (prev.empty() || "op" == prev)) {
+        op->setUnary();
+        // TODO: handle unary operators here
+      } else {
+        std::cerr << "Error: unexpected token '" << t.str()
+                  << "' in expression on line " << t.line() << "." << std::endl;
+        return false;
+      }
+      prev = "op";
     } else if (isValidName(t.str())) {
+      // TODO: handle names (variables and functions) here
       std::cerr << "Error: Names not implemented yet on line "
                 << t.line() << ", name = '" << t.str() << "'." << std::endl;
       return false;
+    } else if (t.str().empty()) {
+      if (0 != parenDepth || (")" != prev && "val" != prev)) {
+        std::cerr << "Error: Unexpected EOF in expression on line "
+                  << t.line() << "." << std::endl;
+        return false;
+      }
+      break;
     } else {
-      std::cerr << "Error: Unexpected token '" << t.str()
-                << "' found on line " << t.line() << "." << std::endl;
-      return false;
+      if (0 != parenDepth || (")" != prev && "val" != prev)) {
+        std::cerr << "Error: Unexpected token '" << t.str()
+                  << "' in expression on line " << t.line() << "." << std::endl;
+        return false;
+      }
+      break;
     }
+    // We actually used the token we peeked at, so consume it here.
+    tokenizer->getNext();
   }
   return true;
 }
