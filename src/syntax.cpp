@@ -81,7 +81,7 @@ bool OperatorToken::parse(const AtomToken& token) {
   static std::vector<std::string> validOps = { "+", "-", "*", "/", "%", "=",
                                                "&", "|", "^", "~", "!", "||",
                                                "&&", "<", "<=", ">", ">=",
-                                               "==", "!=", "[" };
+                                               "==", "!=", "[", "<<", ">>"  };
   _lineNum = token.line();
   for (auto op : validOps) {
     if (token.str() == op) {
@@ -96,7 +96,7 @@ bool OperatorToken::maybeBinary() {
   static std::vector<std::string> validOps = { "+", "-", "*", "/", "%", "=",
                                                "&", "|", "^", "||", "&&", "<",
                                                "<=", ">", ">=", "==", "!=",
-                                               "["  };
+                                               "[", "<<", ">>" };
   for (auto op : validOps) {
     if (_op == op) {
       return true;
@@ -106,13 +106,115 @@ bool OperatorToken::maybeBinary() {
 }
 
 bool OperatorToken::maybeUnary() {
-  static std::vector<std::string> validOps = { "-", "*", "&", "~", "!" };
+  static std::vector<std::string> validOps = { "-", "*", "&", "~", "!", "+" };
   for (auto op : validOps) {
     if (_op == op) {
       return true;
     }
   }
   return false;
+}
+
+int OperatorToken::precedence() const {
+  if ("[" == _op) {
+    return 1;
+  } else if (isUnary()) {
+    return 2;
+  } else if ("*" == _op || "/" == _op || "%" == _op) {
+    return 3;
+  } else if ("+" == _op || "-" == _op) {
+    return 4;
+  } else if ("<<" == _op || ">>" == _op) {
+    return 5;
+  } else if ("<" == _op || "<=" == _op || ">" == _op || ">=" == _op) {
+    return 6;
+  } else if ("==" == _op || "!=" == _op) {
+    return 7;
+  } else if ("&" == _op) {
+    return 8;
+  } else if ("^" == _op) {
+    return 9;
+  } else if ("|" == _op) {
+    return 10;
+  } else if ("&&" == _op) {
+    return 11;
+  } else if ("||" == _op) {
+    return 12;
+  } else if ("=" == _op) {
+    return 13;
+  }
+  return -1;
+}
+
+bool OperatorToken::leftToRight() const {
+  return isBinary();
+}
+
+int OperatorToken::operate(int lhs, int rhs) const {
+  if (isUnary()) {
+    if ("-" == _op) {
+      return -rhs;
+    } else if ("*" == _op) {
+      throw "No dereferencing allowed in constant expressions.";
+    } else if ("&" == _op) {
+      throw "No address-of allowed in constant expressions.";
+    } else if ("~" == _op) {
+      return ~rhs;
+    } else if ("!" == _op) {
+      return !rhs ? 1 : 0;
+    } else if ("+" == _op) {
+      return +rhs;
+    }
+  } else if (isBinary()) {
+    if ("+" == _op) {
+      return lhs + rhs;
+    } else if ("-" == _op) {
+      return lhs - rhs;
+    } else if ("*" == _op) {
+      return lhs * rhs;
+    } else if ("/" == _op) {
+      if (0 == rhs) {
+	throw "Division by zero.";
+      }
+      return lhs / rhs;
+    } else if ("%" == _op) {
+      if (0 == rhs) {
+	throw "Division by zero.";
+      }
+      return lhs % rhs;
+    } else if ("=" == _op) {
+      throw "Assignment not yet supported.";
+    } else if ("&" == _op) {
+      return lhs & rhs;
+    } else if ("|" == _op) {
+      return lhs | rhs;
+    } else if ("^" == _op) {
+      return lhs ^ rhs;
+    } else if ("||" == _op) {
+      return lhs || rhs ? 1 : 0;
+    } else if ("&&" == _op) {
+      return lhs && rhs ? 1 : 0;
+    } else if ("<" == _op) {
+      return lhs < rhs ? 1 : 0;
+    } else if ("<=" == _op) {
+      return lhs <= rhs ? 1 : 0;
+    } else if (">" == _op) {
+      return lhs > rhs ? 1 : 0;
+    } else if (">=" == _op) {
+      return lhs >= rhs ? 1 : 0;
+    } else if ("==" == _op) {
+      return lhs == rhs ? 1 : 0;
+    } else if ("!=" == _op) {
+      return lhs != rhs ? 1 : 0;
+    } else if ("[" == _op) {
+      throw "Array indexing not yet supported.";
+    } else if ("<<" == _op) {
+      return lhs << rhs;
+    } else if (">>" == _op) {
+      return lhs >> rhs;
+    }
+  }
+  throw "Invalid operator in expression";
 }
 
 bool TypeToken::parse(Tokenizer *tokenizer,
@@ -158,8 +260,12 @@ bool ExprToken::parse(Tokenizer *tokenizer,
 
   std::string prev;
   std::stack<std::string> parens;
+  std::stack<std::shared_ptr<Token>> opStack;
   while (true) {
     AtomToken t = tokenizer->peekNext();
+    if (-1 == _lineNum) {
+      _lineNum = t.line();
+    }
     std::shared_ptr<LiteralToken> literal(new LiteralToken());
     std::shared_ptr<OperatorToken> op(new OperatorToken());
     if ("(" == t.str()) {
@@ -170,6 +276,7 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       }
       prev = t.str();
       parens.push(t.str());
+      opStack.push(std::shared_ptr<Token>(new AtomToken("(", t.line())));
     } else if (")" == t.str() || "]" == t.str()) {
       if ((!parens.empty() && otherParen(t.str()) != parens.top()) ||
           (")" != prev && "val" != prev)) {
@@ -179,8 +286,16 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       } else if (parens.empty()) {
         break;
       }
-      prev = ")";
+      // Pop operators off the stack until we reach a corresponding "("
+      while (!opStack.empty() &&
+             typeid(*opStack.top()) == typeid(OperatorToken)) {
+        _postfix.push_back(opStack.top());
+        opStack.pop();
+      }
+      // Pop off the "("
+      opStack.pop();
       parens.pop();
+      prev = ")";
     } else if (literal->parse(t)) {
       if (!prev.empty() && "(" != prev && "op" != prev) {
         std::cerr << "Error: Unexpected token '" << t.str()
@@ -188,23 +303,42 @@ bool ExprToken::parse(Tokenizer *tokenizer,
         return false;
       }
       prev = "val";
-      _root = literal;
+      _postfix.push_back(literal);
     } else if (op->parse(t)) {
-      // If it's an open square bracket, add to parentheses stack.
-      if ("[" == t.str()) {
-        parens.push(t.str());
-      }
       // Determine if the operator is binary or unary.
       if (op->maybeBinary() && (")" == prev || "val" == prev)) {
         op->setBinary();
-        // TODO: handle binary operators here
       } else if (op->maybeUnary() && (prev.empty() || "op" == prev)) {
         op->setUnary();
-        // TODO: handle unary operators here
       } else {
         std::cerr << "Error: unexpected token '" << t.str()
                   << "' in expression on line " << t.line() << "." << std::endl;
         return false;
+      }
+      // Handle the operator stack based on precedence.
+      while (!opStack.empty() &&
+             typeid(*opStack.top()) == typeid(OperatorToken)) {
+        std::shared_ptr<OperatorToken> topOp = std::dynamic_pointer_cast<OperatorToken>(opStack.top());
+        if (op->precedence() < topOp->precedence()) {
+          break;
+        } else if (op->precedence() == topOp->precedence()) {
+          if (op->leftToRight()) {
+            _postfix.push_back(opStack.top());
+            opStack.pop();
+          }
+          break;
+        } else {
+          _postfix.push_back(opStack.top());
+          opStack.pop();
+        }
+      }
+      opStack.push(op);
+      // If it's an open square bracket, add it to the parentheses stack.
+      // Also push an open parenthesis to the operator stack, since the
+      // expression inside [] is treated as if it were parenthesized.
+      if ("[" == t.str()) {
+        parens.push(t.str());
+        opStack.push(std::shared_ptr<Token>(new AtomToken("(", op->line())));
       }
       prev = "op";
     } else if (isValidName(t.str())) {
@@ -230,7 +364,39 @@ bool ExprToken::parse(Tokenizer *tokenizer,
     // We actually used the token we peeked at, so consume it here.
     tokenizer->getNext();
   }
+  // Pop any remaining operators off the stack.
+  while (!opStack.empty()) {
+    _postfix.push_back(opStack.top());
+    opStack.pop();
+  }
   return true;
+}
+
+int ExprToken::val() const {
+  if (!_const) {
+    return 0;
+  }
+  // Evaluate the postfix expression
+  std::stack<int> operands;
+  for (auto token : _postfix) {
+    if (typeid(*token) == typeid(LiteralToken)) {
+      operands.push(token->val());
+    } else if (typeid(*token) == typeid(OperatorToken)) {
+      auto op = std::dynamic_pointer_cast<OperatorToken>(token);
+      int rhs = operands.top();
+      operands.pop();
+      int lhs;
+      if (op->isBinary()) {
+        lhs = operands.top();
+        operands.pop();
+      } else {
+        lhs = 0;
+      }
+      int result = op->operate(lhs, rhs);
+      operands.push(result);
+    }
+  }
+  return operands.top();
 }
 
 bool ArrayExprToken::parse(Tokenizer *tokenizer,
@@ -280,6 +446,7 @@ bool ArrayExprToken::parse(Tokenizer *tokenizer,
 bool GlobalVarToken::parse(Tokenizer *tokenizer,
                            std::vector<FunctionToken> &functions,
                            std::vector<GlobalVarToken> &globals) {
+  _lineNum = _type.line();
   // Validate the type
   if ("void" == _type.name()) {
     std::cerr << "Error: Global var cannot be of type 'void' on line "

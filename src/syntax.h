@@ -51,7 +51,7 @@ class FunctionToken;
  */
 class LiteralToken : public Token {
  public:
-  LiteralToken() : _value(0) { }
+  LiteralToken(int value = 0) : _value(value) { }
   bool parse(const AtomToken& token);
   int val() const { return _value; }
  private:
@@ -90,11 +90,29 @@ class OperatorToken : public Token {
   /**
    * Returns true if the operator has been set to binary with setBinary().
    */
-  bool isBinary() { return _binary; }
+  bool isBinary() const { return _binary; }
   /**
    * Returns true if the operator has been set to unary with setUnary().
    */
-  bool isUnary() { return !_binary; }
+  bool isUnary() const { return !_binary; }
+  /**
+   * Returns the precedence of this operator as an int.
+   */
+  int precedence() const;
+  /**
+   * Returns the associativity of this operator, either left-to-right (true)
+   * or right-to-left (false).
+   */
+  bool leftToRight() const;
+  /**
+   * Returns the result of the operation with the given left hand and right
+   * hand sides.
+   */
+  int operate(int lhs, int rhs) const;
+  /**
+   * Returns a string representation of the operator.
+   */
+  std::string str() const { return _op; }
  private:
   std::string _op;
   bool _binary;
@@ -186,10 +204,10 @@ class ExprToken : public Token {
              std::vector<FunctionToken> &functions,
              std::vector<GlobalVarToken> &globals);
   bool isConst() const { return _const; }
-  int val() const { return _root ? _root->val() : 0; }
+  int val() const;
  private:
   bool _const;
-  std::shared_ptr<Token> _root;
+  std::vector<std::shared_ptr<Token>> _postfix;
 };
 
 /**

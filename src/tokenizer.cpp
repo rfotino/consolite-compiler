@@ -95,7 +95,9 @@ AtomToken Tokenizer::getNext() {
                 ('=' == _data[_offset] && '=' == _data[_offset + 1]) ||
                 ('!' == _data[_offset] && '=' == _data[_offset + 1]) ||
                 ('<' == _data[_offset] && '=' == _data[_offset + 1]) ||
-                ('>' == _data[_offset] && '=' == _data[_offset + 1]))) {
+                ('>' == _data[_offset] && '=' == _data[_offset + 1]) ||
+                ('<' == _data[_offset] && '<' == _data[_offset + 1]) ||
+                ('>' == _data[_offset] && '>' == _data[_offset + 1]))) {
       if (0 == token.length()) {
         token += _data[_offset];
         token += _data[_offset + 1];
