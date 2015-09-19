@@ -25,6 +25,7 @@ class Token {
   int line() const { return _lineNum; }
   virtual int val() const { return 0; }
  protected:
+  void _error(const std::string& msg, int lineNum);
   int _lineNum;
 };
 

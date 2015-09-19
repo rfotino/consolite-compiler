@@ -53,6 +53,12 @@ bool isType(const std::string& type) {
   return "void" == type || "int16" == type || "uint16" == type;
 }
 
+void Token::_error(const std::string& msg, int lineNum) {
+  // TODO: It would be nice to have error messages that showed you
+  // the source line and pointed to the token causing an error.
+  std::cerr << "Error:" << lineNum << ": " << msg << std::endl;
+}
+
 bool LiteralToken::parse(const AtomToken& token) {
   _lineNum = token.line();
   if (std::regex_match(token.str(), std::regex("^0[xX][0-9a-fA-F]+$"))) {
@@ -222,8 +228,7 @@ bool TypeToken::parse(Tokenizer *tokenizer,
                       std::vector<GlobalVarToken> &globals) {
   AtomToken typeName = tokenizer->getNext();
   if (!isType(typeName.str())) {
-    std::cerr << "Error: Invalid type '" << typeName.str() << "' on line "
-              << typeName.line() << "." << std::endl;
+    _error("Invalid type '" + typeName.str() + "'.", typeName.line());
     return false;
   }
   _lineNum = typeName.line();
@@ -236,16 +241,14 @@ bool TypeToken::parse(Tokenizer *tokenizer,
       return false;
     }
     if (!expr.isConst()) {
-      std::cerr << "Error: Array size must be known at compile time on line "
-                << expr.line() << "." << std::endl;
+      _error("Array size must be known at compile time.", expr.line());
       return false;
     }
     _arraySize = expr.val();
     AtomToken endBracket = tokenizer->getNext();
     if ("]" != endBracket.str()) {
-      std::cerr << "Error: Unexpected token '" << endBracket.str()
-                << "', expected ']' on line " << endBracket.line()
-                << "." << std::endl;
+      _error("Unexpected token '" + endBracket.str() + "', expected ']'.",
+             endBracket.line());
       return false;
     }
   }
@@ -270,8 +273,7 @@ bool ExprToken::parse(Tokenizer *tokenizer,
     std::shared_ptr<OperatorToken> op(new OperatorToken());
     if ("(" == t.str()) {
       if (!prev.empty() && "(" != prev && "op" != prev) {
-        std::cerr << "Error: Unexpected token '" << t.str()
-                  << "' in expression on line " << t.line() << "." << std::endl;
+        _error("Unexpected token '" + t.str() + "' in expression.", t.line());
         return false;
       }
       prev = t.str();
@@ -280,8 +282,7 @@ bool ExprToken::parse(Tokenizer *tokenizer,
     } else if (")" == t.str() || "]" == t.str()) {
       if ((!parens.empty() && otherParen(t.str()) != parens.top()) ||
           (")" != prev && "val" != prev)) {
-        std::cerr << "Error: Unexpected token '" << t.str()
-                  << "' in expression on line " << t.line() << "." << std::endl;
+        _error("Unexpected token '" + t.str() + "' in expression.", t.line());
         return false;
       } else if (parens.empty()) {
         break;
@@ -298,8 +299,7 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       prev = ")";
     } else if (literal->parse(t)) {
       if (!prev.empty() && "(" != prev && "op" != prev) {
-        std::cerr << "Error: Unexpected token '" << t.str()
-                  << "' in expression on line " << t.line() << "." << std::endl;
+        _error("Unexpected token '" + t.str() + "' in expression.", t.line());
         return false;
       }
       prev = "val";
@@ -311,8 +311,7 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       } else if (op->maybeUnary() && (prev.empty() || "op" == prev)) {
         op->setUnary();
       } else {
-        std::cerr << "Error: unexpected token '" << t.str()
-                  << "' in expression on line " << t.line() << "." << std::endl;
+        _error("Unexpected token '" + t.str() + "' in expression.", t.line());
         return false;
       }
       // Handle the operator stack based on precedence.
@@ -343,20 +342,17 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       prev = "op";
     } else if (isValidName(t.str())) {
       // TODO: handle names (variables and functions) here
-      std::cerr << "Error: Names not implemented yet on line "
-                << t.line() << ", name = '" << t.str() << "'." << std::endl;
+      _error("Names not yet implemented, name = '" + t.str() + "'.", t.line());
       return false;
     } else if (t.str().empty()) {
       if (!parens.empty() || (")" != prev && "val" != prev)) {
-        std::cerr << "Error: Unexpected EOF in expression on line "
-                  << t.line() << "." << std::endl;
+        _error("Unexpected EOF in expression.", t.line());
         return false;
       }
       break;
     } else {
       if (!parens.empty() || (")" != prev && "val" != prev)) {
-        std::cerr << "Error: Unexpected token '" << t.str()
-                  << "' in expression on line " << t.line() << "." << std::endl;
+        _error("Unexpected token '" + t.str() + "' in expression.", t.line());
         return false;
       }
       break;
@@ -405,12 +401,11 @@ bool ArrayExprToken::parse(Tokenizer *tokenizer,
   // Make sure the first token is a '{' symbol
   AtomToken first = tokenizer->getNext();
   if (first.empty()) {
-    std::cerr << "Error: Unexpected EOF on line " << first.line()
-              << "." << std::endl;
+    _error("Unexpected EOF.", first.line());
     return false;
   } else if ("{" != first.str()) {
-    std::cerr << "Error: Unexpected token '" << first.str() << "', expected "
-              << "'{' on line " << first.line() << "." << std::endl;
+    _error("Unexpected token '" + first.str() + "', expected '{'.",
+           first.line());
     return false;
   }
   _lineNum = first.line();
@@ -431,12 +426,10 @@ bool ArrayExprToken::parse(Tokenizer *tokenizer,
     if ("}" == next.str()) {
       break;
     } else if (next.empty()) {
-      std::cerr << "Error: Unexpected EOF on line " << next.line()
-                << "." << std::endl;
+      _error("Unexpected EOF.", next.line());
       return false;
     } else if ("," != next.str()) {
-      std::cerr << "Error: Unexpected token '" << next.str() << "' on line "
-                << next.line() << "." << std::endl;
+      _error("Unexpected token '" + next.str() + "'.", next.line());
       return false;
     }
   }
@@ -449,22 +442,20 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
   _lineNum = _type.line();
   // Validate the type
   if ("void" == _type.name()) {
-    std::cerr << "Error: Global var cannot be of type 'void' on line "
-              << _type.line() << "." << std::endl;
+    _error("Global var cannot be of type 'void'.", _type.line());
     return false;
   }
   // Validate the name
   if (!isValidName(_name)) {
-    std::cerr << "Error: Invalid global variable name '" << _name << "' on line "
-              << _type.line() << "." << std::endl;
+    _error("Invalid global var name '" + _name + "'.", _type.line());
     return false;
   } else if (isFunctionName(_name, functions)) {
-    std::cerr << "Error: Global var '" << _name << "' on line " << _type.line()
-              << " conflicts with existing function name." << std::endl;
+    _error("Global var '" + _name + "' conflicts with existing function name.",
+           _type.line());
     return false;
   } else if (isGlobalName(_name, globals)) {
-    std::cerr << "Error: Global var '" << _name << "' on line " << _type.line()
-              << " conflicts with existing global var name." << std::endl;
+    _error("Global var '" + _name + "' conflicts with existing gobal var name.",
+           _type.line());
     return false;
   }
   // Validate the value (if set)
@@ -478,15 +469,13 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
       if (!arrayExpr.parse(tokenizer, functions, globals)) {
         return false;
       } else if (arrayExpr.size() != _type.arraySize()) {
-        std::cerr << "Error: Array size mismatch on line " << _type.line()
-                  << "." << std::endl;
+        _error("Array size mismatch.", _type.line());
         return false;
       }
       for (int i = 0; i < arrayExpr.size(); i++) {
         ExprToken expr = arrayExpr.get(i);
         if (!expr.isConst()) {
-          std::cerr << "Error: Global value must be known at compile time on line "
-                    << expr.line() << "." << std::endl;
+          _error("Global value must be known at compile time.", expr.line());
           return false;
         }
         _arrayValues.push_back(expr.val());
@@ -497,8 +486,7 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
       if (!expr.parse(tokenizer, functions, globals)) {
         return false;
       } else if (!expr.isConst()) {
-        std::cerr << "Error: Global value must be known at compile time on line "
-                  << expr.line() << "." << std::endl;
+        _error("Global value must be known at compile time.", expr.line());
         return false;
       }
       _value = expr.val();
@@ -516,12 +504,10 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
     }
   }
   if (last.empty()) {
-    std::cerr << "Error: Unexpected EOF on line " << last.line()
-              << "." << std::endl;
+    _error("Unexpected EOF.", last.line());
     return false;
   } else if (";" != last.str()) {
-    std::cerr << "Error: Unexpected token '" << last.str() << "', expected ';' "
-              << "on line " << last.line() << "." << std::endl;
+    _error("Unexpected token '" + last.str() + "', expected ';'.", last.line());
     return false;
   }
   return true;
