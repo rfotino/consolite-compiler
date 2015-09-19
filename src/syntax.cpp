@@ -8,6 +8,10 @@
 #include "tokenizer.h"
 #include "syntax.h"
 
+/**
+ * Returns the opposing paranthesis for (), [], or {} pairs.
+ * Returns an empty string if the input is not one of the above.
+ */
 std::string otherParen(const std::string& paren) {
   if ("(" == paren) {
     return ")";
@@ -25,40 +29,77 @@ std::string otherParen(const std::string& paren) {
   return "";
 }
 
+/**
+ * Returns true if the given string is a valid name for a function,
+ * variable, etc. A valid name starts with an alphabetic or underscore
+ * character, and is followed by zero or more alphanumeric or
+ * underscore characters.
+ */
 bool isValidName(const std::string& name) {
   return std::regex_match(name, std::regex("^[_a-zA-Z][_a-zA-Z0-9]*$"));
 }
 
-bool isFunctionName(const std::string& name,
-                    const std::vector<FunctionToken>& functions) {
+/**
+ * Searches through a vector of functions and returns the one that matches
+ * the given name, or a null pointer if the name was not found.
+ */
+std::shared_ptr<FunctionToken> getFunction(
+      const std::string& name,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions) {
   for (auto func : functions) {
-    if (func.name() == name) {
-      return true;
+    if (func->name() == name) {
+      return func;
     }
   }
-  return false;
+  return nullptr;
 }
 
-bool isGlobalName(const std::string& name,
-                  const std::vector<GlobalVarToken>& globals) {
+/**
+ * Searches through a vector of globals and returns the one that matches
+ * the given name, or a null pointer if the name was not found.
+ */
+std::shared_ptr<GlobalVarToken> getGlobal(
+     const std::string& name,
+     const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
   for (auto global : globals) {
-    if (global.name() == name) {
-      return true;
+    if (global->name() == name) {
+      return global;
     }
   }
-  return false;
+  return nullptr;
 }
 
+/**
+ * Returns true if the given string names a valid type. There
+ * are only a few valid types right now so this function
+ * is a bit crude.
+ */
 bool isType(const std::string& type) {
   return "void" == type || "int16" == type || "uint16" == type;
 }
 
-void Token::_error(const std::string& msg, int lineNum) {
+/**
+ * Prints an error message with the given line number.
+ */
+void Token::_error(const std::string& msg, int lineNum) const {
   // TODO: It would be nice to have error messages that showed you
   // the source line and pointed to the token causing an error.
   std::cerr << "Error:" << lineNum << ": " << msg << std::endl;
 }
 
+/**
+ * Prints a warning message with the given line number.
+ */
+void Token::_warn(const std::string& msg, int lineNum) const {
+  std::cerr << "Warning:" << lineNum << ": " << msg << std::endl;
+}
+
+/**
+ * Parses a literal value in the code, such as "0x00ff" or "1234".
+ * Only hex and decimal formats supported currently, no string
+ * literals. Only stores up to the maximum value of a signed int.
+ * Returns false if the literal is not in a valid format.
+ */
 bool LiteralToken::parse(const AtomToken& token) {
   _lineNum = token.line();
   if (std::regex_match(token.str(), std::regex("^0[xX][0-9a-fA-F]+$"))) {
@@ -83,6 +124,11 @@ bool LiteralToken::parse(const AtomToken& token) {
   return true;
 }
 
+/**
+ * Checks if the given token represents an operator and sets its internal
+ * _op value equal to the operator. Returns false if the token does not
+ * represent a valid operator.
+ */
 bool OperatorToken::parse(const AtomToken& token) {
   static std::vector<std::string> validOps = { "+", "-", "*", "/", "%", "=",
                                                "&", "|", "^", "~", "!", "||",
@@ -161,9 +207,9 @@ int OperatorToken::operate(int lhs, int rhs) const {
     if ("-" == _op) {
       return -rhs;
     } else if ("*" == _op) {
-      throw "No dereferencing allowed in constant expressions.";
+      throw "Dereferencing not allowed in constant expression.";
     } else if ("&" == _op) {
-      throw "No address-of allowed in constant expressions.";
+      throw "Address-of not allowed in constant expression.";
     } else if ("~" == _op) {
       return ~rhs;
     } else if ("!" == _op) {
@@ -180,16 +226,18 @@ int OperatorToken::operate(int lhs, int rhs) const {
       return lhs * rhs;
     } else if ("/" == _op) {
       if (0 == rhs) {
-	throw "Division by zero.";
+        _warn("Division by zero in expression.", _lineNum);
+        return 0xffff;
       }
       return lhs / rhs;
     } else if ("%" == _op) {
       if (0 == rhs) {
-	throw "Division by zero.";
+        _warn("Division by zero in expression.", _lineNum);
+        return 0xffff;
       }
       return lhs % rhs;
     } else if ("=" == _op) {
-      throw "Assignment not yet supported.";
+      throw "Assignment not allowed in constant expression.";
     } else if ("&" == _op) {
       return lhs & rhs;
     } else if ("|" == _op) {
@@ -220,12 +268,18 @@ int OperatorToken::operate(int lhs, int rhs) const {
       return lhs >> rhs;
     }
   }
-  throw "Invalid operator in expression";
+  throw "Invalid operator '" + _op + "' in expression.";
 }
 
-bool TypeToken::parse(Tokenizer *tokenizer,
-                      std::vector<FunctionToken> &functions,
-                      std::vector<GlobalVarToken> &globals) {
+/**
+ * Parses either a single type or an array type, like "uint16"
+ * or "uint16[32]". The expression within square brackets must
+ * be known at compile time.
+ */
+bool TypeToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
   AtomToken typeName = tokenizer->getNext();
   if (!isType(typeName.str())) {
     _error("Invalid type '" + typeName.str() + "'.", typeName.line());
@@ -255,12 +309,16 @@ bool TypeToken::parse(Tokenizer *tokenizer,
   return true;
 }
 
-bool ExprToken::parse(Tokenizer *tokenizer,
-                      std::vector<FunctionToken> &functions,
-                      std::vector<GlobalVarToken> &globals) {
-  functions = functions;
-  globals = globals;
-
+/**
+ * Parses an expression from infix to postfix notation, then validates it,
+ * then evaluates the expression if it can be known at compile time. Returns
+ * false if there is anything wrong with the expression. Sets the _const and
+ * _value internal variables appropriately.
+ */
+bool ExprToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
   std::string prev;
   std::stack<std::string> parens;
   std::stack<std::shared_ptr<Token>> opStack;
@@ -317,7 +375,7 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       // Handle the operator stack based on precedence.
       while (!opStack.empty() &&
              typeid(*opStack.top()) == typeid(OperatorToken)) {
-        std::shared_ptr<OperatorToken> topOp = std::dynamic_pointer_cast<OperatorToken>(opStack.top());
+        auto topOp = std::dynamic_pointer_cast<OperatorToken>(opStack.top());
         if (op->precedence() < topOp->precedence()) {
           break;
         } else if (op->precedence() == topOp->precedence()) {
@@ -341,9 +399,22 @@ bool ExprToken::parse(Tokenizer *tokenizer,
       }
       prev = "op";
     } else if (isValidName(t.str())) {
-      // TODO: handle names (variables and functions) here
-      _error("Names not yet implemented, name = '" + t.str() + "'.", t.line());
-      return false;
+      auto globalVar = getGlobal(t.str(), globals);
+      auto function = getFunction(t.str(), functions);
+      if (nullptr != globalVar) {
+        // If the name represents a global variable, push it onto the stack
+        _postfix.push_back(globalVar);
+        prev = "val";
+      } else if (nullptr != function) {
+        // TODO: handle function calls here
+        _error("Function calls not yet implemented, "
+               "invalid token '" + t.str() + "'.",
+               t.line());
+        return false;
+      } else {
+        _error("Unknown token '" + t.str() + "'.", t.line());
+        return false;
+      }
     } else if (t.str().empty()) {
       if (!parens.empty() || (")" != prev && "val" != prev)) {
         _error("Unexpected EOF in expression.", t.line());
@@ -365,39 +436,89 @@ bool ExprToken::parse(Tokenizer *tokenizer,
     _postfix.push_back(opStack.top());
     opStack.pop();
   }
+  // Validate the expression for further errors.
+  if (!_validate()) {
+    return false;
+  }
+  // Evaluate the expression, if it is known at compile-time.
+  _evaluate();
   return true;
 }
 
-int ExprToken::val() const {
-  if (!_const) {
-    return 0;
-  }
+/**
+ * Validate the assignments in the expression, make sure that we only
+ * assign to types that can be assigned to.
+ */
+bool ExprToken::_validate() {
+  // TODO: implement this
+  return true;
+}
+
+/**
+ * Tries to evaluate the expression as if it were constant, setting
+ * _const appropriately and _value if succesful. Warns of certain errors
+ * like divide by zero.
+ */
+void ExprToken::_evaluate() {
   // Evaluate the postfix expression
-  std::stack<int> operands;
+  std::stack<std::shared_ptr<Token>> operands;
   for (auto token : _postfix) {
-    if (typeid(*token) == typeid(LiteralToken)) {
-      operands.push(token->val());
+    if (typeid(*token) == typeid(LiteralToken) ||
+        typeid(*token) == typeid(GlobalVarToken)) {
+      operands.push(token);
     } else if (typeid(*token) == typeid(OperatorToken)) {
       auto op = std::dynamic_pointer_cast<OperatorToken>(token);
-      int rhs = operands.top();
+      std::shared_ptr<Token> rhs = operands.top();
       operands.pop();
-      int lhs;
+      std::shared_ptr<Token> lhs;
       if (op->isBinary()) {
         lhs = operands.top();
         operands.pop();
       } else {
-        lhs = 0;
+        lhs = nullptr;
       }
-      int result = op->operate(lhs, rhs);
-      operands.push(result);
+      int result;
+      // If using assignment, dereferencing, or address-of, this
+      // expression is not considered constant.
+      if (("=" == op->str() && op->isBinary()) ||
+          (("&" == op->str() || "*" == op->str()) && op->isUnary())) {
+        _const = false;
+        return;
+      } else if ("[" == op->str() && op->isBinary()) {
+        if (typeid(*lhs) != typeid(GlobalVarToken)) {
+          _const = false;
+          return;
+        }
+        auto global = std::dynamic_pointer_cast<GlobalVarToken>(lhs);
+        if (!global->isArray()) {
+          _const = false;
+          return;
+        } else if (global->arraySize() <= rhs->val() || rhs->val() < 0) {
+          _warn("Array index out of bounds in expression.", _lineNum);
+          _const = false;
+          return;
+        }
+        result = global->arrayVal(rhs->val());
+      } else {
+        result = op->operate(lhs ? lhs->val() : 0, rhs->val());
+      }
+      operands.push(std::shared_ptr<Token>(new LiteralToken(result)));
+    } else {
+      _const = false;
+      return;
     }
   }
-  return operands.top();
+  _value = operands.top()->val();
 }
 
-bool ArrayExprToken::parse(Tokenizer *tokenizer,
-                           std::vector<FunctionToken> &functions,
-                           std::vector<GlobalVarToken> &globals) {
+/**
+ * Parses an array expression like "{1,2,3}" where 1, 2, and 3 could
+ * be an arbitrary non-array expression.
+ */
+bool ArrayExprToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>> &functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
   // Make sure the first token is a '{' symbol
   AtomToken first = tokenizer->getNext();
   if (first.empty()) {
@@ -436,9 +557,17 @@ bool ArrayExprToken::parse(Tokenizer *tokenizer,
   return true;
 }
 
-bool GlobalVarToken::parse(Tokenizer *tokenizer,
-                           std::vector<FunctionToken> &functions,
-                           std::vector<GlobalVarToken> &globals) {
+/**
+ * Parses a global variable declaration and possibly assignment.
+ * Assigns a value to the global variable, either zero if not
+ * assigned or the value of the constant expression it is assigned to.
+ * Returns false if the expression it is assigned to cannot be known
+ * at compile time, or if there is another syntax error.
+ */
+bool GlobalVarToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
   _lineNum = _type.line();
   // Validate the type
   if ("void" == _type.name()) {
@@ -449,11 +578,11 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
   if (!isValidName(_name)) {
     _error("Invalid global var name '" + _name + "'.", _type.line());
     return false;
-  } else if (isFunctionName(_name, functions)) {
+  } else if (getFunction(_name, functions)) {
     _error("Global var '" + _name + "' conflicts with existing function name.",
            _type.line());
     return false;
-  } else if (isGlobalName(_name, globals)) {
+  } else if (getGlobal(_name, globals)) {
     _error("Global var '" + _name + "' conflicts with existing gobal var name.",
            _type.line());
     return false;
@@ -513,9 +642,10 @@ bool GlobalVarToken::parse(Tokenizer *tokenizer,
   return true;
 }
 
-bool FunctionToken::parse(Tokenizer *tokenizer,
-                          std::vector<FunctionToken> &functions,
-                          std::vector<GlobalVarToken> &globals) {
+bool FunctionToken::parse(
+      Tokenizer *tokenizer,
+      std::vector<std::shared_ptr<FunctionToken>>& functions,
+      std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
   tokenizer = tokenizer;
   functions = functions;
   globals = globals;

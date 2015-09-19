@@ -25,7 +25,8 @@ class Token {
   int line() const { return _lineNum; }
   virtual int val() const { return 0; }
  protected:
-  void _error(const std::string& msg, int lineNum);
+  void _error(const std::string& msg, int lineNum) const;
+  void _warn(const std::string& msg, int lineNum) const;
   int _lineNum;
 };
 
@@ -128,8 +129,8 @@ class TypeToken : public Token {
  public:
   TypeToken() : _isArray(false), _arraySize(-1) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<FunctionToken> &functions,
-             std::vector<GlobalVarToken> &globals);
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   std::string name() const { return _name; }
   bool isArray() const { return _isArray; }
   int arraySize() const { return _arraySize; }
@@ -150,11 +151,14 @@ class GlobalVarToken : public Token {
   GlobalVarToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<FunctionToken> &functions,
-             std::vector<GlobalVarToken> &globals);
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
   int val() const { return _value; }
+  bool isArray() const { return _type.isArray(); }
+  int arraySize() const { return _arrayValues.size(); }
+  int arrayVal(int i) const { return _arrayValues.at(i); }
  private:
   TypeToken _type;
   std::string _name;
@@ -182,8 +186,8 @@ class FunctionToken : public Token {
   FunctionToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<FunctionToken> &functions,
-             std::vector<GlobalVarToken> &globals);
+             std::vector<std::shared_ptr<FunctionToken>>& functions,
+             std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
  private:
@@ -200,14 +204,37 @@ class FunctionToken : public Token {
  */
 class ExprToken : public Token {
  public:
-  ExprToken() : _const(true) { }
+  ExprToken() : _const(true), _value(0) { }
   bool parse(Tokenizer *tokenizer,
-             std::vector<FunctionToken> &functions,
-             std::vector<GlobalVarToken> &globals);
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   bool isConst() const { return _const; }
-  int val() const;
+  int val() const { return _value; }
  private:
+  /**
+   * Validates the expression to see if it will compile. Prints errors if
+   * using an rvalue on the left side of an assignment, etc. Returns true
+   * if the expression is valid, or false otherwise.
+   */
+  bool _validate();
+  /**
+   * Tries to evaluate the expression as if it were constant, setting _const
+   * appropriately and _value if successful. Warns of divide by zero errors
+   * etc.
+   */
+  void _evaluate();
+  /**
+   * Whether this expression is constant (meaning, in this context, known
+   * at compile-time).
+   */
   bool _const;
+  /**
+   * The constant value of this expression, as known at compile-time.
+   */
+  int _value;
+  /**
+   * A list of tokens in this expression, in postfix notation.
+   */
   std::vector<std::shared_ptr<Token>> _postfix;
 };
 
@@ -218,8 +245,8 @@ class ExprToken : public Token {
 class ArrayExprToken : public Token {
  public:
   bool parse(Tokenizer *tokenizer,
-             std::vector<FunctionToken> &functions,
-             std::vector<GlobalVarToken> &globals);
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   int size() const { return _exprs.size(); }
   ExprToken get(int i) const { return _exprs[i]; }
  private:

@@ -25,8 +25,8 @@ class Parser {
 
  private:
   Tokenizer *_tokenizer;
-  std::vector<GlobalVarToken> _globals;
-  std::vector<FunctionToken> _functions;
+  std::vector<std::shared_ptr<GlobalVarToken>> _globals;
+  std::vector<std::shared_ptr<FunctionToken>> _functions;
 };
 
 #endif

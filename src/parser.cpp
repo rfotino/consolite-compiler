@@ -31,15 +31,15 @@ bool Parser::parse() {
 
     // Differentiate between function and global variable
     if ("(" == _tokenizer->peekNext().str()) {
-      FunctionToken func(type, name.str());
-      if (!func.parse(_tokenizer, _functions, _globals)) {
+      std::shared_ptr<FunctionToken> func(new FunctionToken(type, name.str()));
+      if (!func->parse(_tokenizer, _functions, _globals)) {
         error = true;
         break;
       }
       _functions.push_back(func);
     } else {
-      GlobalVarToken var(type, name.str());
-      if (!var.parse(_tokenizer, _functions, _globals)) {
+      std::shared_ptr<GlobalVarToken> var(new GlobalVarToken(type, name.str()));
+      if (!var->parse(_tokenizer, _functions, _globals)) {
         error = true;
         break;
       }
