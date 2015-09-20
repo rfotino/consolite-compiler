@@ -40,6 +40,21 @@ bool isValidName(const std::string& name) {
 }
 
 /**
+ * Searches through a vector of parameters and returns the one that matches
+ * the given name, or a null pointer if the name was not found.
+ */
+std::shared_ptr<ParamToken> getParameter(
+      const std::string& name,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters) {
+  for (auto param : parameters) {
+    if (param->name() == name) {
+      return param;
+    }
+  }
+  return nullptr;
+}
+
+/**
  * Searches through a vector of functions and returns the one that matches
  * the given name, or a null pointer if the name was not found.
  */
@@ -679,12 +694,91 @@ bool GlobalVarToken::parse(
   return true;
 }
 
+/**
+ * Parses out a type and a name for the parameter, making sure
+ * the type is appropriate for a parameter and the name doesn't
+ * conflict with a function or global variable name.
+ *
+ * TODO: Implement default values.
+ */
+bool ParamToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
+  if (!_type.parse(tokenizer, functions, globals)) {
+    return false;
+  } else if (_type.isArray()) {
+    _error("Array parameter types not supported.", _type.line());
+    return false;
+  } else if ("void" == _type.name()) {
+    _error("Parameter cannot be of type void.", _type.line());
+    return false;
+  }
+  AtomToken nameToken = tokenizer->getNext();
+  if (nameToken.str().empty()) {
+    _error("Unexpected EOF.", nameToken.line());
+    return false;
+  } else if (!isValidName(nameToken.str())) {
+    _error("Invalid parameter name '" + nameToken.str() + "'.",
+           nameToken.line());
+    return false;
+  } else if (getFunction(nameToken.str(), functions)) {
+    _error("Parameter name '" + nameToken.str() + "' conflicts with "
+           "function name.", nameToken.line());
+    return false;
+  } else if (getGlobal(nameToken.str(), globals)) {
+    _error("Parameter name '" + nameToken.str() + "' conflicts with "
+           " global var name.", nameToken.line());
+    return false;
+  }
+  _name = nameToken.str();
+  return true;
+}
+
+/**
+ * Parses a function's parameter signature and the function body.
+ */
 bool FunctionToken::parse(
       Tokenizer *tokenizer,
       std::vector<std::shared_ptr<FunctionToken>>& functions,
       std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
-  tokenizer = tokenizer;
-  functions = functions;
-  globals = globals;
+  // Make sure the first token is an open parenthesis
+  AtomToken t = tokenizer->peekNext();
+  _lineNum = t.line();
+  if (t.str().empty()) {
+    _error("Unexpected EOF.", t.line());
+  } if ("(" != t.str()) {
+    _error("Unexpected token '" + t.str() + "', expected '('.", t.line());
+    return false;
+  }
+  tokenizer->getNext();
+  // Get the parameters
+  while (")" != tokenizer->peekNext().str()) {
+    std::shared_ptr<ParamToken> param(new ParamToken());
+    if (!param->parse(tokenizer, functions, globals)) {
+      return false;
+    } else if (getParameter(param->name(), _parameters)) {
+      _error("Parameter '" + param->name() + "' conflicts with existing "
+             "parameter name.", param->line());
+      return false;
+    }
+    _parameters.push_back(param);
+    t = tokenizer->peekNext();
+    if (t.str().empty()) {
+      _error("Unexpected EOF.", t.line());
+      return false;
+    } else if ("," == t.str()) {
+      tokenizer->getNext();
+      continue;
+    } else if (")" != t.str()) {
+      _error("Unexpected token '" + t.str() + "'.", t.line());
+      return false;
+    }
+  }
+  // Consume the closing parenthesis
+  tokenizer->getNext();
+  // Add self to the functions list
+  functions.push_back(shared_from_this());
+  // TODO: get the function body
   return true;
 }

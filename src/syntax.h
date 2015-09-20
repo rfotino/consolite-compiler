@@ -167,8 +167,14 @@ class GlobalVarToken : public Token {
 };
 
 class ParamToken : public Token {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
+  TypeToken type() const { return _type; }
+  std::string name() const { return _name; }
  private:
-  std::string _type;
+  TypeToken _type;
   std::string _name;
 };
 
@@ -181,7 +187,8 @@ class StatementToken : public Token {
  * a list of parameters, and a list of top-level statements. The parse()
  * function separates the parameters and statements into their own tokens.
  */
-class FunctionToken : public Token {
+class FunctionToken : public Token,
+                      public std::enable_shared_from_this<FunctionToken> {
  public:
   FunctionToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
@@ -193,7 +200,7 @@ class FunctionToken : public Token {
  private:
   TypeToken _type;
   std::string _name;
-  std::vector<ParamToken> _parameters;
+  std::vector<std::shared_ptr<ParamToken>> _parameters;
   std::vector<StatementToken> _statements;
 };
 
