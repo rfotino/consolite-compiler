@@ -450,7 +450,44 @@ bool ExprToken::parse(
  * assign to types that can be assigned to.
  */
 bool ExprToken::_validate() {
-  // TODO: implement this
+  std::stack<std::string> operands;
+  for (auto token : _postfix) {
+    if (typeid(*token) == typeid(LiteralToken)) {
+      operands.push("rvalue");
+    } else if (typeid(*token) == typeid(GlobalVarToken)) {
+      operands.push("lvalue");
+    } else if (typeid(*token) == typeid(OperatorToken)) {
+      auto op = std::dynamic_pointer_cast<OperatorToken>(token);
+      std::string rhs = operands.top();
+      operands.pop();
+      std::string lhs;
+      if (op->isBinary()) {
+        lhs = operands.top();
+        operands.pop();
+      }
+      std::string result;
+      if ("=" == op->str()) {
+        if ("lvalue" != lhs) {
+          _error("Can't assign to an rvalue in expression.", op->line());
+          return false;
+        }
+        result = "rvalue";
+      } else if ("*" == op->str() && op->isUnary()) {
+        result = "lvalue";
+      } else if ("&" == op->str() && op->isUnary()) {
+        if ("lvalue" != rhs) {
+          _error("Can't get address of an rvalue in expression.", op->line());
+          return false;
+        }
+        result = "rvalue";
+      } else if ("[" == op->str()) {
+        result = "lvalue";
+      } else {
+        result = "rvalue";
+      }
+      operands.push(result);
+    }
+  }
   return true;
 }
 
