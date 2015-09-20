@@ -25,8 +25,6 @@ class Token {
   int line() const { return _lineNum; }
   virtual uint16_t val() const { return 0; }
  protected:
-  void _error(const std::string& msg, int lineNum) const;
-  void _warn(const std::string& msg, int lineNum) const;
   int _lineNum;
 };
 
@@ -45,6 +43,7 @@ class AtomToken : public Token {
   std::string _str;
 };
 
+class LocalVarToken;
 class GlobalVarToken;
 class FunctionToken;
 
@@ -178,8 +177,24 @@ class ParamToken : public Token {
   std::string _name;
 };
 
+/**
+ * A token that represents a statement inside of a function, such as
+ * a local variable declaration, a for loop, an if statement, etc.
+ */
 class StatementToken : public Token {
-
+ public:
+  /**
+   * Parses the next statement from the tokenizer and returns a pointer
+   * to it. Returns a null pointer if the next statement isn't valid.
+   */
+  static std::shared_ptr<StatementToken> parse(
+        Tokenizer *tokenizer,
+        const std::vector<std::shared_ptr<FunctionToken>>& functions,
+        const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+        const std::vector<std::shared_ptr<ParamToken>>& parameters,
+        const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+        const std::shared_ptr<FunctionToken>& currentFunc,
+        bool inLoop = false);
 };
 
 /**
@@ -201,7 +216,8 @@ class FunctionToken : public Token,
   TypeToken _type;
   std::string _name;
   std::vector<std::shared_ptr<ParamToken>> _parameters;
-  std::vector<StatementToken> _statements;
+  std::vector<std::shared_ptr<LocalVarToken>> _localVars;
+  std::vector<std::shared_ptr<StatementToken>> _statements;
 };
 
 /**

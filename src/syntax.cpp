@@ -96,7 +96,7 @@ bool isType(const std::string& type) {
 /**
  * Prints an error message with the given line number.
  */
-void Token::_error(const std::string& msg, int lineNum) const {
+void _error(const std::string& msg, int lineNum) {
   // TODO: It would be nice to have error messages that showed you
   // the source line and pointed to the token causing an error.
   std::cerr << "Error:" << lineNum << ": " << msg << std::endl;
@@ -105,7 +105,7 @@ void Token::_error(const std::string& msg, int lineNum) const {
 /**
  * Prints a warning message with the given line number.
  */
-void Token::_warn(const std::string& msg, int lineNum) const {
+void _warn(const std::string& msg, int lineNum) {
   std::cerr << "Warning:" << lineNum << ": " << msg << std::endl;
 }
 
@@ -779,6 +779,62 @@ bool FunctionToken::parse(
   tokenizer->getNext();
   // Add self to the functions list
   functions.push_back(shared_from_this());
-  // TODO: get the function body
+  // Get the function body. Make sure it starts with a '}'.
+  t = tokenizer->getNext();
+  if (t.str().empty()) {
+    _error("Unexpected EOF.", t.line());
+    return false;
+  } else if ("{" != t.str()) {
+    _error("Unexpected token '" + t.str() + "', expected '{'.", t.line());
+    return false;
+  }
+  // Get the statements within the function body.
+  while ("}" != tokenizer->peekNext().str()) {
+    auto statement = StatementToken::parse(tokenizer, functions, globals,
+                                           _parameters, _localVars,
+                                           shared_from_this());
+    // If the statement is valid, add it to the list of statements.
+    if (!statement) {
+      return false;
+    }
+    _statements.push_back(statement);
+    // If it's a local variable declaration, add it to the list of local
+    // variables.
+    if (typeid(*statement) == typeid(LocalVarToken)) {
+      _localVars.push_back(std::dynamic_pointer_cast<LocalVarToken>(statement));
+    }
+    // Check for EOF
+    AtomToken t = tokenizer->peekNext();
+    if (t.str().empty()) {
+      _error("Unexpected EOF.", t.line());
+      return false;
+    }
+  }
+  // Consume the '}' token
+  tokenizer->getNext();
   return true;
+}
+
+/**
+ * Gets the next statement and returns a pointer to it. Returns
+ * a null pointer if there is no valid next statement.
+ */
+std::shared_ptr<StatementToken> StatementToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      const std::shared_ptr<FunctionToken>& currentFunc,
+      bool inLoop) {
+  // TODO: Attempt to parse a statement.
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  localVars.size();
+  currentFunc->name();
+  inLoop = inLoop;
+  _error("Statements not yet implemented.", tokenizer->peekNext().line());
+  return nullptr;
 }
