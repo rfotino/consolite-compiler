@@ -45,6 +45,10 @@ class AtomToken : public Token {
 
 class GlobalVarToken;
 class FunctionToken;
+class ParamToken;
+class LocalVarToken;
+class StatementToken;
+class LabelStatement;
 
 /**
  * A token representing a literal value from the code like "0x1234" or "4321".
@@ -128,7 +132,9 @@ class TypeToken : public Token {
   TypeToken() : _isArray(false), _arraySize(-1) { }
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
-             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters = {},
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars = {});
   std::string name() const { return _name; }
   bool isArray() const { return _isArray; }
   size_t arraySize() const { return _arraySize; }
@@ -179,10 +185,6 @@ class ParamToken : public Token {
   std::string _name;
 };
 
-class StatementToken;
-class LocalVarToken;
-class LabelStatement;
-
 /**
  * A token representing a function definition. Has a return type,
  * a list of parameters, and a list of top-level statements. The parse()
@@ -217,7 +219,9 @@ class ExprToken : public Token {
   ExprToken() : _const(true), _value(0) { }
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
-             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters = {},
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars = {});
   bool isConst() const { return _const; }
   uint16_t val() const { return _value; }
  private:
@@ -256,11 +260,13 @@ class ArrayExprToken : public Token {
  public:
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
-             const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters = {},
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars = {});
   size_t size() const { return _exprs.size(); }
-  ExprToken get(int i) const { return _exprs[i]; }
+  std::shared_ptr<ExprToken> get(int i) const { return _exprs[i]; }
  private:
-  std::vector<ExprToken> _exprs;
+  std::vector<std::shared_ptr<ExprToken>> _exprs;
 };
 
 /**
@@ -311,11 +317,16 @@ class LocalVarToken : public StatementToken {
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+  std::string name() const { return _name; }
  private:
   TypeToken _type;
   std::string _name;
-  ExprToken _value;
-  bool _hasValue;
+  /**
+   * The initialization expressions. This will be an empty vector
+   * if there was no initialization, or a single value if _type is
+   * not an array, or one or more values if _type is an array.
+   */
+  std::vector<std::shared_ptr<ExprToken>> _initExprs;
 };
 
 /**

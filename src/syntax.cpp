@@ -64,6 +64,21 @@ std::shared_ptr<ParamToken> getParameter(
 }
 
 /**
+ * Searches through a vector of local variables and returns the one that
+ * matches the given name, or a null pointer if the name was not found.
+ */
+std::shared_ptr<LocalVarToken> getLocal(
+      const std::string& name,
+      const std::vector<std::shared_ptr<LocalVarToken>>& locals) {
+  for (auto local : locals) {
+    if (local->name() == name) {
+      return local;
+    }
+  }
+  return nullptr;
+}
+
+/**
  * Searches through a vector of functions and returns the one that matches
  * the given name, or a null pointer if the name was not found.
  */
@@ -303,7 +318,9 @@ uint16_t OperatorToken::operate(uint16_t lhs, uint16_t rhs) const {
 bool TypeToken::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
-      const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
   AtomToken typeName = tokenizer->getNext();
   if (!isType(typeName.str())) {
     _error("Invalid type '" + typeName.str() + "'.", typeName.line());
@@ -315,7 +332,7 @@ bool TypeToken::parse(
     tokenizer->getNext();
     _isArray = true;
     ExprToken expr;
-    if (!expr.parse(tokenizer, functions, globals)) {
+    if (!expr.parse(tokenizer, functions, globals, parameters, localVars)) {
       return false;
     }
     if (!expr.isConst()) {
@@ -342,7 +359,9 @@ bool TypeToken::parse(
 bool ExprToken::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
-      const std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
   std::string prev;
   std::stack<std::string> parens;
   std::stack<std::shared_ptr<Token>> opStack;
@@ -425,9 +444,19 @@ bool ExprToken::parse(
     } else if (isValidName(t.str())) {
       auto globalVar = getGlobal(t.str(), globals);
       auto function = getFunction(t.str(), functions);
+      auto param = getParameter(t.str(), parameters);
+      auto localVar = getLocal(t.str(), localVars);
       if (nullptr != globalVar) {
         // If the name represents a global variable, push it onto the stack
         _postfix.push_back(globalVar);
+        prev = "val";
+      } else if (nullptr != param) {
+        // If the name represents a parameter, push it onto the stack
+        _postfix.push_back(param);
+        prev = "val";
+      } else if (nullptr != localVar) {
+        // If the name represents a parameter, push it onto the stack
+        _postfix.push_back(localVar);
         prev = "val";
       } else if (nullptr != function) {
         // TODO: handle function calls here
@@ -478,7 +507,9 @@ bool ExprToken::_validate() {
   for (auto token : _postfix) {
     if (typeid(*token) == typeid(LiteralToken)) {
       operands.push("rvalue");
-    } else if (typeid(*token) == typeid(GlobalVarToken)) {
+    } else if (typeid(*token) == typeid(GlobalVarToken) ||
+               typeid(*token) == typeid(ParamToken) ||
+               typeid(*token) == typeid(LocalVarToken)) {
       operands.push("lvalue");
     } else if (typeid(*token) == typeid(OperatorToken)) {
       auto op = std::dynamic_pointer_cast<OperatorToken>(token);
@@ -527,6 +558,12 @@ void ExprToken::_evaluate() {
     if (typeid(*token) == typeid(LiteralToken) ||
         typeid(*token) == typeid(GlobalVarToken)) {
       operands.push(token);
+    } else if (typeid(*token) == typeid(ParamToken) ||
+               typeid(*token) == typeid(LocalVarToken)) {
+      // We don't know parameter or local variable values at
+      // compile time, so this expression can't be constant.
+      _const = false;
+      return;
     } else if (typeid(*token) == typeid(OperatorToken)) {
       auto op = std::dynamic_pointer_cast<OperatorToken>(token);
       std::shared_ptr<Token> rhs = operands.top();
@@ -578,8 +615,10 @@ void ExprToken::_evaluate() {
  */
 bool ArrayExprToken::parse(
       Tokenizer *tokenizer,
-      const std::vector<std::shared_ptr<FunctionToken>> &functions,
-      const std::vector<std::shared_ptr<GlobalVarToken>> &globals) {
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
   // Make sure the first token is a '{' symbol
   AtomToken first = tokenizer->getNext();
   if (first.empty()) {
@@ -599,8 +638,8 @@ bool ArrayExprToken::parse(
   }
   // Get any expressions we find, separated by commas
   while (true) {
-    ExprToken expr;
-    if (!expr.parse(tokenizer, functions, globals)) {
+    std::shared_ptr<ExprToken> expr(new ExprToken());
+    if (!expr->parse(tokenizer, functions, globals, parameters, localVars)) {
       return false;
     }
     _exprs.push_back(expr);
@@ -644,7 +683,7 @@ bool GlobalVarToken::parse(
            _type.line());
     return false;
   } else if (getGlobal(_name, globals)) {
-    _error("Global var '" + _name + "' conflicts with existing gobal var name.",
+    _error("Global var '" + _name + "' conflicts with existing global var name.",
            _type.line());
     return false;
   }
@@ -663,12 +702,12 @@ bool GlobalVarToken::parse(
         return false;
       }
       for (size_t i = 0; i < arrayExpr.size(); i++) {
-        ExprToken expr = arrayExpr.get(i);
-        if (!expr.isConst()) {
-          _error("Global value must be known at compile time.", expr.line());
+        auto expr = arrayExpr.get(i);
+        if (!expr->isConst()) {
+          _error("Global value must be known at compile time.", expr->line());
           return false;
         }
-        _arrayValues.push_back(expr.val());
+        _arrayValues.push_back(expr->val());
       }
     } else {
       // Not an array value, get the singleton initialization expression
@@ -978,15 +1017,80 @@ bool LocalVarToken::parse(
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
-  // TODO: Parse local variable declarations.
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  localVars.size();
-  _error("Local var declaration not yet implemented.", _lineNum);
-  return false;
+  // Parse the type
+  if (!_type.parse(tokenizer, functions, globals, parameters, localVars)) {
+    return false;
+  }
+  // Validate the type
+  if ("void" == _type.name()) {
+    _error("Local var cannot be of type 'void'.", _type.line());
+    return false;
+  }
+  // Get and validate the name
+  AtomToken nameToken = tokenizer->getNext();
+  if (nameToken.str().empty()) {
+    _error("Unexpected EOF.", nameToken.line());
+    return false;
+  }
+  _name = nameToken.str();
+  if (!isValidName(_name)) {
+    _error("Invalid local var name '" + _name + "'.", _type.line());
+    return false;
+  } else if (getFunction(_name, functions)) {
+    _error("Local var '" + _name + "' conflicts with existing function name.",
+           nameToken.line());
+    return false;
+  } else if (getGlobal(_name, globals)) {
+    _error("Local var '" + _name + "' conflicts with existing global var name.",
+           nameToken.line());
+    return false;
+  } else if (getParameter(_name, parameters)) {
+    _error("Local var '" + _name + "' conflicts with existing parameter name.",
+           nameToken.line());
+    return false;
+  } else if (getLocal(_name, localVars)) {
+    _error("Local var '" + _name + "' conflicts with existing local var name.",
+           nameToken.line());
+    return false;
+  }
+  // Validate the value (if set)
+  AtomToken next = tokenizer->getNext();
+  AtomToken last = next;
+  if ("=" == next.str()) {
+    if (_type.isArray()) {
+      // Make sure array expression has as many values as the type
+      // requires, and make sure they are all constant.
+      ArrayExprToken arrayExpr;
+      if (!arrayExpr.parse(tokenizer, functions, globals,
+                           parameters, localVars)) {
+        return false;
+      } else if (arrayExpr.size() != _type.arraySize()) {
+        _error("Array size mismatch.", _lineNum);
+        return false;
+      }
+      for (size_t i = 0; i < arrayExpr.size(); i++) {
+        _initExprs.push_back(arrayExpr.get(i));
+      }
+    } else {
+      // Not an array value, get the singleton initialization expression
+      std::shared_ptr<ExprToken> expr(new ExprToken());
+      if (!expr->parse(tokenizer, functions, globals)) {
+        return false;
+      }
+      _initExprs.push_back(expr);
+    }
+    // This should be a semicolon
+    last = tokenizer->getNext();
+  }
+  if (last.empty()) {
+    _error("Unexpected EOF.", last.line());
+    return false;
+  } else if (";" != last.str()) {
+    _error("Unexpected token '" + last.str() + "', expected ';'.", last.line());
+    return false;
+  }
+  return true;
 }
 
 bool ExprStatement::parse(
