@@ -458,8 +458,8 @@ class ReturnStatement : public StatementToken {
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
              const std::shared_ptr<FunctionToken>& currentFunc);
  private:
-  ExprToken _returnValue;
-  bool _hasValue;
+  ExprToken _returnExpr;
+  bool _hasExpr;
 };
 
 /**

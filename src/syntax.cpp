@@ -1352,24 +1352,47 @@ bool DoWhileStatement::parse(
   return true;
 }
 
+/**
+ * A break statement should just be the "break" token followed
+ * by a ";" token. If we are not in a loop, that is an error.
+ */
 bool BreakStatement::parse(Tokenizer *tokenizer, bool inLoop) {
-  // TODO: Parse break statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  inLoop = inLoop;
-  _error("Break statement not yet implemented.", _lineNum);
-  return false;
+  if (!_expect(tokenizer, "break")) {
+    return false;
+  } else if (!_expect(tokenizer, ";")) {
+    return false;
+  } else if (!inLoop) {
+    _error("Must be within a loop statement to use 'break;'.", _lineNum);
+    return false;
+  }
+  return true;
 }
 
+/**
+ * A continue statement should just be the "continue" token followed
+ * by a ";" token. If we are not in a loop, that is an error.
+ */
 bool ContinueStatement::parse(Tokenizer *tokenizer, bool inLoop) {
-  // TODO: Parse continue statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  inLoop = inLoop;
-  _error("Continue statement not yet implemented.", _lineNum);
-  return false;
+  if (!_expect(tokenizer, "continue")) {
+    return false;
+  } else if (!_expect(tokenizer, ";")) {
+    return false;
+  } else if (!inLoop) {
+    _error("Must be within a loop statement to use 'continue;'.", _lineNum);
+    return false;
+  }
+  return true;
 }
 
+/**
+ * A return statement is of the form:
+ * "return [EXPR] ;"
+ * where EXPR is an optional arbitrary expression. If we are within
+ * a void function, EXPR must not be included. If we are within a
+ * non-void function, EXPR must be included.
+ */
 bool ReturnStatement::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
@@ -1377,16 +1400,36 @@ bool ReturnStatement::parse(
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
       const std::shared_ptr<FunctionToken>& currentFunc) {
-  // TODO: Parse return statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  localVars.size();
-  currentFunc->name();
-  _error("Return statement not yet implemented.", _lineNum);
-  return false;
+  // Make sure the first token is the "return" keyword.
+  if (!_expect(tokenizer, "return")) {
+    return false;
+  }
+  // If the next token is not a semicolon, parse the expression.
+  if (";" != tokenizer->peekNext().str()) {
+    _hasExpr = true;
+    if (!_returnExpr.parse(tokenizer, functions, globals,
+                           parameters, localVars)) {
+      return false;
+    }
+  } else {
+    _hasExpr = false;
+  }
+  // Check for the trailing semicolon.
+  if (!_expect(tokenizer, ";")) {
+    return false;
+  }
+  // Make sure that _hasExpr matches up with the void-ness of the
+  // containing function.
+  if (_hasExpr && "void" == currentFunc->type().name()) {
+    _error("Cannot return a value from a void function.", _lineNum);
+    return false;
+  } else if (!_hasExpr && "void" != currentFunc->type().name()) {
+    _error("Return statement must include a value in a non-void function.",
+           _lineNum);
+    return false;
+  }
+  return true;
 }
 
 bool LabelStatement::parse(
