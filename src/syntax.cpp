@@ -751,6 +751,19 @@ bool FunctionToken::parse(
       Tokenizer *tokenizer,
       std::vector<std::shared_ptr<FunctionToken>>& functions,
       std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
+  // Validate the name
+  if (!isValidName(_name)) {
+    _error("Invalid function name '" + _name + "'.", _type.line());
+    return false;
+  } else if (getFunction(_name, functions)) {
+    _error("Function '" + _name + "' conflicts with existing function name.",
+           _type.line());
+    return false;
+  } else if (getGlobal(_name, globals)) {
+    _error("Function '" + _name + "' conflicts with existing global var name.",
+           _type.line());
+    return false;
+  }
   // Make sure the first token is an open parenthesis
   AtomToken t = tokenizer->peekNext();
   _lineNum = t.line();
