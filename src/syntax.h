@@ -49,6 +49,7 @@ class ParamToken;
 class LocalVarToken;
 class StatementToken;
 class LabelStatement;
+class GotoStatement;
 
 /**
  * A token representing a literal value from the code like "0x1234" or "4321".
@@ -206,6 +207,7 @@ class FunctionToken : public Token,
   std::vector<std::shared_ptr<ParamToken>> _parameters;
   std::vector<std::shared_ptr<LocalVarToken>> _localVars;
   std::vector<std::shared_ptr<LabelStatement>> _labels;
+  std::vector<std::shared_ptr<GotoStatement>> _gotos;
   std::vector<std::shared_ptr<StatementToken>> _statements;
 };
 
@@ -287,6 +289,7 @@ class StatementToken : public Token {
         const std::vector<std::shared_ptr<ParamToken>>& parameters,
         const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
         std::vector<std::shared_ptr<LabelStatement>>& labels,
+        std::vector<std::shared_ptr<GotoStatement>>& gotos,
         const std::shared_ptr<FunctionToken>& currentFunc,
         bool inLoop = false);
 };
@@ -302,6 +305,7 @@ class CompoundStatement : public StatementToken {
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
              std::vector<std::shared_ptr<LabelStatement>>& labels,
+             std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc,
              bool inLoop);
  private:
@@ -364,6 +368,7 @@ class IfStatement : public StatementToken {
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
              std::vector<std::shared_ptr<LabelStatement>>& labels,
+             std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc,
              bool inLoop);
  private:
@@ -393,6 +398,7 @@ class ForStatement : public LoopStatement {
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
              std::vector<std::shared_ptr<LabelStatement>>& labels,
+             std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc);
  private:
   std::vector<std::shared_ptr<ExprToken>> _initExprs;
@@ -410,6 +416,7 @@ class WhileStatement : public LoopStatement {
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
              std::vector<std::shared_ptr<LabelStatement>>& labels,
+             std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc);
 };
 
@@ -424,6 +431,7 @@ class DoWhileStatement : public LoopStatement {
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
              std::vector<std::shared_ptr<LabelStatement>>& labels,
+             std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc);
 };
 
@@ -466,11 +474,9 @@ class ReturnStatement : public StatementToken {
  * A token representing a label declaration that can be jumped to
  * with a goto statement. Looks like a name followed by a colon.
  */
-class LabelStatement : public StatementToken,
-                       public std::enable_shared_from_this<LabelStatement> {
+class LabelStatement : public StatementToken {
  public:
-  bool parse(Tokenizer *tokenizer,
-             std::vector<std::shared_ptr<LabelStatement>>& labels);
+  bool parse(Tokenizer *tokenizer);
   std::string name() const { return _name; }
  private:
   std::string _name;
@@ -482,10 +488,10 @@ class LabelStatement : public StatementToken,
  */
 class GotoStatement : public StatementToken {
  public:
-  bool parse(Tokenizer *tokenizer,
-             const std::vector<std::shared_ptr<LabelStatement>>& labels);
+  bool parse(Tokenizer *tokenizer);
+  std::string label() const { return _label; }
  private:
-  std::shared_ptr<LabelStatement> _label;
+  std::string _label;
 };
 
 #endif
