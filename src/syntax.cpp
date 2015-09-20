@@ -800,7 +800,7 @@ bool FunctionToken::parse(
   // Get the statements within the function body.
   while ("}" != tokenizer->peekNext().str()) {
     auto statement = StatementToken::parse(tokenizer, functions, globals,
-                                           _parameters, _labels, _localVars,
+                                           _parameters, _localVars, _labels,
                                            shared_from_this());
     // If the statement is valid, add it to the list of statements.
     if (!statement) {
@@ -811,8 +811,6 @@ bool FunctionToken::parse(
     // variables.
     if (typeid(*statement) == typeid(LocalVarToken)) {
       _localVars.push_back(std::dynamic_pointer_cast<LocalVarToken>(statement));
-    } else if (typeid(*statement) == typeid(LabelStatement)) {
-      _labels.push_back(std::dynamic_pointer_cast<LabelStatement>(statement));
     }
     // Check for EOF
     AtomToken t = tokenizer->peekNext();
@@ -835,8 +833,8 @@ std::shared_ptr<StatementToken> StatementToken::parse(
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
-      const std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc,
       bool inLoop) {
   AtomToken t = tokenizer->peekNext();
@@ -846,31 +844,31 @@ std::shared_ptr<StatementToken> StatementToken::parse(
   } else if ("{" == t.str()) {
     std::shared_ptr<CompoundStatement> compound(new CompoundStatement());
     if (compound->parse(tokenizer, functions, globals, parameters,
-                        labels, localVars, currentFunc, inLoop)) {
+                        localVars, labels, currentFunc, inLoop)) {
       return compound;
     }
   } else if ("if" == t.str()) {
     std::shared_ptr<IfStatement> ifStatement(new IfStatement());
     if (ifStatement->parse(tokenizer, functions, globals, parameters,
-                           labels, localVars, currentFunc, inLoop)) {
+                           localVars, labels, currentFunc, inLoop)) {
       return ifStatement;
     }
   } else if ("for" == t.str()) {
     std::shared_ptr<ForStatement> forStatement(new ForStatement());
     if (forStatement->parse(tokenizer, functions, globals, parameters,
-                            labels, localVars, currentFunc)) {
+                            localVars, labels, currentFunc)) {
       return forStatement;
     }
   } else if ("while" == t.str()) {
     std::shared_ptr<WhileStatement> whileStatement(new WhileStatement());
     if (whileStatement->parse(tokenizer, functions, globals, parameters,
-                              labels, localVars, currentFunc)) {
+                              localVars, labels, currentFunc)) {
       return whileStatement;
     }
   } else if ("do" == t.str()) {
     std::shared_ptr<DoWhileStatement> doWhileStatement(new DoWhileStatement());
     if (doWhileStatement->parse(tokenizer, functions, globals, parameters,
-                                labels, localVars, currentFunc)) {
+                                localVars, labels, currentFunc)) {
       return doWhileStatement;
     }
   } else if ("break" == t.str()) {
@@ -924,8 +922,8 @@ bool CompoundStatement::parse(
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
-      const std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc,
       bool inLoop) {
   _lineNum = tokenizer->peekNext().line();
@@ -942,7 +940,7 @@ bool CompoundStatement::parse(
   // Get the inner statements.
   while ("}" != tokenizer->peekNext().str()) {
     auto statement = StatementToken::parse(tokenizer, functions, globals,
-                                           parameters, labels, localVars,
+                                           parameters, localVars, labels,
                                            currentFunc, inLoop);
     if (!statement) {
       return false;
@@ -1000,8 +998,8 @@ bool IfStatement::parse(
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
-      const std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc,
       bool inLoop) {
   // TODO: Parse if statements
@@ -1023,8 +1021,8 @@ bool ForStatement::parse(
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
-      const std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc) {
   // TODO: Parse for statements
   _lineNum = tokenizer->peekNext().line();
@@ -1044,8 +1042,8 @@ bool WhileStatement::parse(
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
-      const std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc) {
   // TODO: Parse while statements
   _lineNum = tokenizer->peekNext().line();
@@ -1065,8 +1063,8 @@ bool DoWhileStatement::parse(
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
-      const std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc) {
   // TODO: Parse do-while statements
   _lineNum = tokenizer->peekNext().line();
@@ -1120,13 +1118,22 @@ bool ReturnStatement::parse(
 
 bool LabelStatement::parse(
       Tokenizer *tokenizer,
-      const std::vector<std::shared_ptr<LabelStatement>>& labels) {
-  // TODO: Parse label statements
+      std::vector<std::shared_ptr<LabelStatement>>& labels) {
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  labels.size();
-  _error("Label declaration not yet implemented.", _lineNum);
-  return false;
+  // Make sure it is a valid label declaration.
+  AtomToken t = tokenizer->getNext();
+  if (t.str().empty()) {
+    _error("Unexpected EOF.", t.line());
+    return false;
+  } else if (!isLabelDeclaration(t.str())) {
+    _error("Invalid label declaration.", t.line());
+    return false;
+  }
+  // Name is the label declaration minus the trailing colon.
+  _name = t.str().substr(0, t.str().size() - 1);
+  // Add to the function's list of labels.
+  labels.push_back(shared_from_this());
+  return true;
 }
 
 bool GotoStatement::parse(

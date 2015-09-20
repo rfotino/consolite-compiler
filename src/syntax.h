@@ -278,8 +278,8 @@ class StatementToken : public Token {
         const std::vector<std::shared_ptr<FunctionToken>>& functions,
         const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
         const std::vector<std::shared_ptr<ParamToken>>& parameters,
-        const std::vector<std::shared_ptr<LabelStatement>>& labels,
         const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+        std::vector<std::shared_ptr<LabelStatement>>& labels,
         const std::shared_ptr<FunctionToken>& currentFunc,
         bool inLoop = false);
 };
@@ -293,8 +293,8 @@ class CompoundStatement : public StatementToken {
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
-             const std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::shared_ptr<FunctionToken>& currentFunc,
              bool inLoop);
  private:
@@ -350,8 +350,8 @@ class IfStatement : public StatementToken {
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
-             const std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::shared_ptr<FunctionToken>& currentFunc,
              bool inLoop);
  private:
@@ -379,8 +379,8 @@ class ForStatement : public LoopStatement {
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
-             const std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::shared_ptr<FunctionToken>& currentFunc);
  private:
   ExprToken _initExpr;
@@ -396,8 +396,8 @@ class WhileStatement : public LoopStatement {
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
-             const std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::shared_ptr<FunctionToken>& currentFunc);
 };
 
@@ -410,8 +410,8 @@ class DoWhileStatement : public LoopStatement {
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
-             const std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::shared_ptr<FunctionToken>& currentFunc);
 };
 
@@ -454,10 +454,12 @@ class ReturnStatement : public StatementToken {
  * A token representing a label declaration that can be jumped to
  * with a goto statement. Looks like a name followed by a colon.
  */
-class LabelStatement : public StatementToken {
+class LabelStatement : public StatementToken,
+                       public std::enable_shared_from_this<LabelStatement> {
  public:
   bool parse(Tokenizer *tokenizer,
-             const std::vector<std::shared_ptr<LabelStatement>>& labels);
+             std::vector<std::shared_ptr<LabelStatement>>& labels);
+  std::string name() const { return _name; }
  private:
   std::string _name;
 };
