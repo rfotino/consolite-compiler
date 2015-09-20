@@ -40,6 +40,15 @@ bool isValidName(const std::string& name) {
 }
 
 /**
+ * Returns true if the given string is a valid label declaration.
+ * A label declaration starts with a valid name and is followed by
+ * a colon.
+ */
+bool isLabelDeclaration(const std::string& label) {
+  return std::regex_match(label, std::regex("^[_a-zA-Z][_a-zA-Z0-9]*:$"));
+}
+
+/**
  * Searches through a vector of parameters and returns the one that matches
  * the given name, or a null pointer if the name was not found.
  */
@@ -791,7 +800,7 @@ bool FunctionToken::parse(
   // Get the statements within the function body.
   while ("}" != tokenizer->peekNext().str()) {
     auto statement = StatementToken::parse(tokenizer, functions, globals,
-                                           _parameters, _localVars,
+                                           _parameters, _labels, _localVars,
                                            shared_from_this());
     // If the statement is valid, add it to the list of statements.
     if (!statement) {
@@ -802,6 +811,8 @@ bool FunctionToken::parse(
     // variables.
     if (typeid(*statement) == typeid(LocalVarToken)) {
       _localVars.push_back(std::dynamic_pointer_cast<LocalVarToken>(statement));
+    } else if (typeid(*statement) == typeid(LabelStatement)) {
+      _labels.push_back(std::dynamic_pointer_cast<LabelStatement>(statement));
     }
     // Check for EOF
     AtomToken t = tokenizer->peekNext();
@@ -824,17 +835,288 @@ std::shared_ptr<StatementToken> StatementToken::parse(
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
       const std::shared_ptr<FunctionToken>& currentFunc,
       bool inLoop) {
-  // TODO: Attempt to parse a statement.
+  AtomToken t = tokenizer->peekNext();
+  if (t.str().empty()) {
+    _error("Unexpected EOF.", t.line());
+    return nullptr;
+  } else if ("{" == t.str()) {
+    std::shared_ptr<CompoundStatement> compound(new CompoundStatement());
+    if (compound->parse(tokenizer, functions, globals, parameters,
+                        labels, localVars, currentFunc, inLoop)) {
+      return compound;
+    }
+  } else if ("if" == t.str()) {
+    std::shared_ptr<IfStatement> ifStatement(new IfStatement());
+    if (ifStatement->parse(tokenizer, functions, globals, parameters,
+                           labels, localVars, currentFunc, inLoop)) {
+      return ifStatement;
+    }
+  } else if ("for" == t.str()) {
+    std::shared_ptr<ForStatement> forStatement(new ForStatement());
+    if (forStatement->parse(tokenizer, functions, globals, parameters,
+                            labels, localVars, currentFunc)) {
+      return forStatement;
+    }
+  } else if ("while" == t.str()) {
+    std::shared_ptr<WhileStatement> whileStatement(new WhileStatement());
+    if (whileStatement->parse(tokenizer, functions, globals, parameters,
+                              labels, localVars, currentFunc)) {
+      return whileStatement;
+    }
+  } else if ("do" == t.str()) {
+    std::shared_ptr<DoWhileStatement> doWhileStatement(new DoWhileStatement());
+    if (doWhileStatement->parse(tokenizer, functions, globals, parameters,
+                                labels, localVars, currentFunc)) {
+      return doWhileStatement;
+    }
+  } else if ("break" == t.str()) {
+    std::shared_ptr<BreakStatement> breakStatement(new BreakStatement());
+    if (breakStatement->parse(tokenizer, inLoop)) {
+      return breakStatement;
+    }
+  } else if ("continue" == t.str()) {
+    std::shared_ptr<ContinueStatement> continueStatement(new ContinueStatement());
+    if (continueStatement->parse(tokenizer, inLoop)) {
+      return continueStatement;
+    }
+  } else if ("return" == t.str()) {
+    std::shared_ptr<ReturnStatement> returnStatement(new ReturnStatement());
+    if (returnStatement->parse(tokenizer, functions, globals, parameters,
+                               localVars, currentFunc)) {
+      return returnStatement;
+    }
+  } else if ("goto" == t.str()) {
+    std::shared_ptr<GotoStatement> gotoStatement(new GotoStatement());
+    if (gotoStatement->parse(tokenizer, labels)) {
+      return gotoStatement;
+    }
+  } else if (";" == t.str()) {
+    std::shared_ptr<NullStatement> nullStatement(new NullStatement());
+    // Consume ';' token.
+    tokenizer->getNext();
+    return nullStatement;
+  } else if (isLabelDeclaration(t.str())) {
+    std::shared_ptr<LabelStatement> labelStatement(new LabelStatement());
+    if (labelStatement->parse(tokenizer, labels)) {
+      return labelStatement;
+    }
+  } else if (isType(t.str())) {
+    std::shared_ptr<LocalVarToken> localVar(new LocalVarToken());
+    if (localVar->parse(tokenizer, functions, globals, parameters, localVars)) {
+      return localVar;
+    }
+  } else {
+    std::shared_ptr<ExprStatement> exprStatement(new ExprStatement());
+    if (exprStatement->parse(tokenizer, functions, globals, parameters,
+                             localVars)) {
+      return exprStatement;
+    }
+  }
+  return nullptr;
+}
+
+bool CompoundStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      const std::shared_ptr<FunctionToken>& currentFunc,
+      bool inLoop) {
+  // TODO: Parse compound statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  labels.size();
+  localVars.size();
+  currentFunc->name();
+  inLoop = inLoop;
+  _error("Compound statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool LocalVarToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
+  // TODO: Parse local variable declarations.
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  localVars.size();
+  _error("Local var declaration not yet implemented.", _lineNum);
+  return false;
+}
+
+bool ExprStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
+  // TODO: Parse expression statements.
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  localVars.size();
+  _error("Expression statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool IfStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      const std::shared_ptr<FunctionToken>& currentFunc,
+      bool inLoop) {
+  // TODO: Parse if statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  labels.size();
+  localVars.size();
+  currentFunc->name();
+  inLoop = inLoop;
+  _error("If statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool ForStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      const std::shared_ptr<FunctionToken>& currentFunc) {
+  // TODO: Parse for statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  labels.size();
+  localVars.size();
+  currentFunc->name();
+  _error("For statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool WhileStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      const std::shared_ptr<FunctionToken>& currentFunc) {
+  // TODO: Parse while statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  labels.size();
+  localVars.size();
+  currentFunc->name();
+  _error("While statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool DoWhileStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      const std::shared_ptr<FunctionToken>& currentFunc) {
+  // TODO: Parse do-while statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  functions.size();
+  globals.size();
+  parameters.size();
+  labels.size();
+  localVars.size();
+  currentFunc->name();
+  _error("Do-while statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool BreakStatement::parse(Tokenizer *tokenizer, bool inLoop) {
+  // TODO: Parse break statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  inLoop = inLoop;
+  _error("Break statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool ContinueStatement::parse(Tokenizer *tokenizer, bool inLoop) {
+  // TODO: Parse continue statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  inLoop = inLoop;
+  _error("Continue statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool ReturnStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+      const std::shared_ptr<FunctionToken>& currentFunc) {
+  // TODO: Parse return statements
+  _lineNum = tokenizer->peekNext().line();
   tokenizer = tokenizer;
   functions.size();
   globals.size();
   parameters.size();
   localVars.size();
   currentFunc->name();
-  inLoop = inLoop;
-  _error("Statements not yet implemented.", tokenizer->peekNext().line());
-  return nullptr;
+  _error("Return statement not yet implemented.", _lineNum);
+  return false;
+}
+
+bool LabelStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels) {
+  // TODO: Parse label statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  labels.size();
+  _error("Label declaration not yet implemented.", _lineNum);
+  return false;
+}
+
+bool GotoStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<LabelStatement>>& labels) {
+  // TODO: Parse goto statements
+  _lineNum = tokenizer->peekNext().line();
+  tokenizer = tokenizer;
+  labels.size();
+  _error("Goto statement not yet implemented.", _lineNum);
+  return false;
 }

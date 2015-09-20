@@ -43,7 +43,6 @@ class AtomToken : public Token {
   std::string _str;
 };
 
-class LocalVarToken;
 class GlobalVarToken;
 class FunctionToken;
 
@@ -165,6 +164,9 @@ class GlobalVarToken : public Token {
   std::vector<uint16_t> _arrayValues;
 };
 
+/**
+ * A token representing a type and a name of a parameter for a function.
+ */
 class ParamToken : public Token {
  public:
   bool parse(Tokenizer *tokenizer,
@@ -177,25 +179,9 @@ class ParamToken : public Token {
   std::string _name;
 };
 
-/**
- * A token that represents a statement inside of a function, such as
- * a local variable declaration, a for loop, an if statement, etc.
- */
-class StatementToken : public Token {
- public:
-  /**
-   * Parses the next statement from the tokenizer and returns a pointer
-   * to it. Returns a null pointer if the next statement isn't valid.
-   */
-  static std::shared_ptr<StatementToken> parse(
-        Tokenizer *tokenizer,
-        const std::vector<std::shared_ptr<FunctionToken>>& functions,
-        const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
-        const std::vector<std::shared_ptr<ParamToken>>& parameters,
-        const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
-        const std::shared_ptr<FunctionToken>& currentFunc,
-        bool inLoop = false);
-};
+class StatementToken;
+class LocalVarToken;
+class LabelStatement;
 
 /**
  * A token representing a function definition. Has a return type,
@@ -217,6 +203,7 @@ class FunctionToken : public Token,
   std::string _name;
   std::vector<std::shared_ptr<ParamToken>> _parameters;
   std::vector<std::shared_ptr<LocalVarToken>> _localVars;
+  std::vector<std::shared_ptr<LabelStatement>> _labels;
   std::vector<std::shared_ptr<StatementToken>> _statements;
 };
 
@@ -276,29 +263,97 @@ class ArrayExprToken : public Token {
   std::vector<ExprToken> _exprs;
 };
 
-class LocalVarToken : public Token {
+/**
+ * A token that represents a statement inside of a function, such as
+ * a local variable declaration, a for loop, an if statement, etc.
+ */
+class StatementToken : public Token {
+ public:
+  /**
+   * Parses the next statement from the tokenizer and returns a pointer
+   * to it. Returns a null pointer if the next statement isn't valid.
+   */
+  static std::shared_ptr<StatementToken> parse(
+        Tokenizer *tokenizer,
+        const std::vector<std::shared_ptr<FunctionToken>>& functions,
+        const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+        const std::vector<std::shared_ptr<ParamToken>>& parameters,
+        const std::vector<std::shared_ptr<LabelStatement>>& labels,
+        const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+        const std::shared_ptr<FunctionToken>& currentFunc,
+        bool inLoop = false);
+};
+
+/**
+ * A token representing a list of statement tokens within curly braces.
+ */
+class CompoundStatement : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LabelStatement>>& labels,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             const std::shared_ptr<FunctionToken>& currentFunc,
+             bool inLoop);
  private:
-  std::string _type;
+  std::vector<StatementToken> _statements;
+};
+
+/**
+ * A token that represents a local variable declaration.
+ */
+class LocalVarToken : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+ private:
+  TypeToken _type;
   std::string _name;
   ExprToken _value;
   bool _hasValue;
 };
 
+/**
+ * A token representing an expression statement, which is an
+ * expression followed by a semicolon. The expression can have side
+ * effects if it includes assignment or function calls.
+ */
 class ExprStatement : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
  private:
   ExprToken _expr;
 };
 
+/**
+ * A token representing a null statement, which is simply a ';' token.
+ */
 class NullStatement : public StatementToken {
 
 };
 
-class CompoundStatement : public StatementToken {
- private:
-  std::vector<StatementToken> _statements;
-};
-
+/**
+ * A token representing an if statement, with optional else statement.
+ */
 class IfStatement : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LabelStatement>>& labels,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             const std::shared_ptr<FunctionToken>& currentFunc,
+             bool inLoop);
  private:
   ExprToken _condExpr;
   StatementToken _trueStatement;
@@ -306,48 +361,117 @@ class IfStatement : public StatementToken {
   bool _hasElse;
 };
 
+/**
+ * A token representing a generic loop.
+ */
 class LoopStatement : public StatementToken {
  private:
   ExprToken _condExpr;
   StatementToken _body;
 };
 
+/**
+ * A token representing a for loop.
+ */
 class ForStatement : public LoopStatement {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LabelStatement>>& labels,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             const std::shared_ptr<FunctionToken>& currentFunc);
  private:
   ExprToken _initExpr;
   ExprToken _loopExpr;
 };
 
+/**
+ * A token representing a while loop.
+ */
 class WhileStatement : public LoopStatement {
-
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LabelStatement>>& labels,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             const std::shared_ptr<FunctionToken>& currentFunc);
 };
 
+/**
+ * A token representing a do-while loop.
+ */
 class DoWhileStatement : public LoopStatement {
-
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LabelStatement>>& labels,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             const std::shared_ptr<FunctionToken>& currentFunc);
 };
 
+/**
+ * A token representing a break statement for breaking out
+ * of a loop.
+ */
 class BreakStatement : public StatementToken {
-
+ public:
+  bool parse(Tokenizer *tokenizer, bool inLoop);
 };
 
+/**
+ * A token representing a continue statement for skipping the
+ * rest of the current loop iteration.
+ */
 class ContinueStatement : public StatementToken {
-
+ public:
+  bool parse(Tokenizer *tokenizer, bool inLoop);
 };
 
+/**
+ * A token representing a return statement, possibly with an
+ * expression representing a return value.
+ */
 class ReturnStatement : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
+             const std::shared_ptr<FunctionToken>& currentFunc);
  private:
   ExprToken _returnValue;
   bool _hasValue;
 };
 
+/**
+ * A token representing a label declaration that can be jumped to
+ * with a goto statement. Looks like a name followed by a colon.
+ */
 class LabelStatement : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<LabelStatement>>& labels);
  private:
   std::string _name;
 };
 
+/**
+ * A token representing a goto statement, which jumps to a label
+ * declaration.
+ */
 class GotoStatement : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<LabelStatement>>& labels);
  private:
-  std::string _label;
+  std::shared_ptr<LabelStatement> _label;
 };
 
 #endif
