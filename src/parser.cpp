@@ -46,9 +46,10 @@ bool Parser::parse() {
       _globals.push_back(var);
     }
   }
-  return error;
+  return !error;
 }
 
 void Parser::output(char *filename) {
-  filename = filename;
+  std::cerr << "Error: Parser::output() not yet implemented. Output file '"
+            << filename << "' is unchanged." << std::endl;
 }

@@ -500,11 +500,16 @@ bool ExprToken::parse(
         _postfix.push_back(localVar);
         prev = "val";
       } else if (nullptr != function) {
-        // TODO: handle function calls here
-        _error("Function calls not yet implemented, "
-               "invalid token '" + t.str() + "'.",
-               t.line());
-        return false;
+        std::shared_ptr<FunctionCallToken> fnCall(new FunctionCallToken());
+        if (!fnCall->parse(tokenizer, functions, globals,
+                           parameters, localVars)) {
+          return false;
+        }
+        _postfix.push_back(fnCall);
+        prev = "val";
+        // Continue so we don't consume an extra token at the end, all
+        // tokens have been consumed already for the function call.
+        continue;
       } else {
         _error("Unknown token '" + t.str() + "'.", t.line());
         return false;
@@ -546,7 +551,8 @@ bool ExprToken::parse(
 bool ExprToken::_validate() {
   std::stack<std::string> operands;
   for (auto token : _postfix) {
-    if (typeid(*token) == typeid(LiteralToken)) {
+    if (typeid(*token) == typeid(LiteralToken) ||
+        typeid(*token) == typeid(FunctionCallToken)) {
       operands.push("rvalue");
     } else if (typeid(*token) == typeid(GlobalVarToken) ||
                typeid(*token) == typeid(ParamToken) ||
@@ -600,9 +606,11 @@ void ExprToken::_evaluate() {
         typeid(*token) == typeid(GlobalVarToken)) {
       operands.push(token);
     } else if (typeid(*token) == typeid(ParamToken) ||
-               typeid(*token) == typeid(LocalVarToken)) {
+               typeid(*token) == typeid(LocalVarToken) ||
+               typeid(*token) == typeid(FunctionCallToken)) {
       // We don't know parameter or local variable values at
-      // compile time, so this expression can't be constant.
+      // compile time, nor do we know the output of functions,
+      // so this expression can't be constant.
       _const = false;
       return;
     } else if (typeid(*token) == typeid(OperatorToken)) {
@@ -688,6 +696,70 @@ bool ArrayExprToken::parse(
       _error("Unexpected token '" + next.str() + "'.", next.line());
       return false;
     }
+  }
+  return true;
+}
+
+/**
+ * Parses a function call within an expression. A function call is of the
+ * form "FUNC_NAME ( [ARG_LIST] )", where ARG_LIST is an optional
+ * comma-separated list of expressions.
+ */
+bool FunctionCallToken::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
+  _lineNum = tokenizer->peekNext().line();
+  // Start by getting the name of the function we are calling.
+  AtomToken nameToken = tokenizer->getNext();
+  if (nameToken.str().empty()) {
+    _error("Unexpected EOF.", nameToken.line());
+    return false;
+  } else if (!isValidName(nameToken.str())) {
+    _error("Invalid name for a function.", nameToken.line());
+    return false;
+  }
+  _funcName = nameToken.str();
+  // Next get the pointer to the function so that we know it exists
+  // and can validate the arguments with the parameters later on.
+  auto function = getFunction(_funcName, functions);
+  if (!function) {
+    _error("Function '" + _funcName + "' does not exist.", _lineNum);
+    return false;
+  }
+  // The next token should be an open parenthesis.
+  if (!_expect(tokenizer, "(")) {
+    return false;
+  }
+  // Now get the comma-separated list of expressions.
+  if (")" != tokenizer->peekNext().str()) {
+    while (true) {
+      std::shared_ptr<ExprToken> expr(new ExprToken());
+      if (!expr->parse(tokenizer, functions, globals, parameters, localVars)) {
+        return false;
+      }
+      _arguments.push_back(expr);
+      // If the next token is not a comma, we are done. Otherwise consume
+      // the comma and continue.
+      if ("," != tokenizer->peekNext().str()) {
+        break;
+      }
+      tokenizer->getNext();
+    }
+  }
+  // Consume the closing parenthesis.
+  if (!_expect(tokenizer, ")")) {
+    return false;
+  }
+  // Check that the number of parameters is correct.
+  if (this->numArgs() != function->numParams()) {
+    _error("Invalid function call, expected " +
+           std::to_string(function->numParams()) + " arguments but got " +
+           std::to_string(this->numArgs()) + ".",
+           _lineNum);
+    return false;
   }
   return true;
 }

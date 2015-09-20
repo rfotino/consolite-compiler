@@ -201,6 +201,8 @@ class FunctionToken : public Token,
              std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
+  size_t numParams() const { return _parameters.size(); }
+  std::shared_ptr<ParamToken> getParam(int i) const { return _parameters.at(i); }
  private:
   TypeToken _type;
   std::string _name;
@@ -270,6 +272,24 @@ class ArrayExprToken : public Token {
   std::shared_ptr<ExprToken> get(int i) const { return _exprs[i]; }
  private:
   std::vector<std::shared_ptr<ExprToken>> _exprs;
+};
+
+/**
+ * A token that represents a function call used in an expression.
+ * it stores the function name and the parameter expressions.
+ */
+class FunctionCallToken : public Token {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+  std::string funcName() const { return _funcName; }
+  size_t numArgs() const { return _arguments.size(); }
+ private:
+  std::string _funcName;
+  std::vector<std::shared_ptr<ExprToken>> _arguments;
 };
 
 /**
