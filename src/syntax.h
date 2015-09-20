@@ -23,7 +23,7 @@ class Token {
  public:
   Token() : _lineNum(-1) { }
   int line() const { return _lineNum; }
-  virtual int val() const { return 0; }
+  virtual uint16_t val() const { return 0; }
  protected:
   void _error(const std::string& msg, int lineNum) const;
   void _warn(const std::string& msg, int lineNum) const;
@@ -53,11 +53,11 @@ class FunctionToken;
  */
 class LiteralToken : public Token {
  public:
-  LiteralToken(int value = 0) : _value(value) { }
+  LiteralToken(uint16_t value = 0) : _value(value) { }
   bool parse(const AtomToken& token);
-  int val() const { return _value; }
+  uint16_t val() const { return _value; }
  private:
-  int _value;
+  uint16_t _value;
 };
 
 /**
@@ -110,7 +110,7 @@ class OperatorToken : public Token {
    * Returns the result of the operation with the given left hand and right
    * hand sides.
    */
-  int operate(int lhs, int rhs) const;
+  uint16_t operate(uint16_t lhs, uint16_t rhs) const;
   /**
    * Returns a string representation of the operator.
    */
@@ -133,11 +133,11 @@ class TypeToken : public Token {
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   std::string name() const { return _name; }
   bool isArray() const { return _isArray; }
-  int arraySize() const { return _arraySize; }
+  size_t arraySize() const { return _arraySize; }
  private:
   std::string _name;
   bool _isArray;
-  int _arraySize;
+  uint16_t _arraySize;
 };
 
 /**
@@ -155,15 +155,15 @@ class GlobalVarToken : public Token {
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
-  int val() const { return _value; }
+  uint16_t val() const { return _value; }
   bool isArray() const { return _type.isArray(); }
-  int arraySize() const { return _arrayValues.size(); }
-  int arrayVal(int i) const { return _arrayValues.at(i); }
+  uint16_t arraySize() const { return _arrayValues.size(); }
+  uint16_t arrayVal(int i) const { return _arrayValues.at(i); }
  private:
   TypeToken _type;
   std::string _name;
-  int _value;
-  std::vector<int> _arrayValues;
+  uint16_t _value;
+  std::vector<uint16_t> _arrayValues;
 };
 
 class ParamToken : public Token {
@@ -209,7 +209,7 @@ class ExprToken : public Token {
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
   bool isConst() const { return _const; }
-  int val() const { return _value; }
+  uint16_t val() const { return _value; }
  private:
   /**
    * Validates the expression to see if it will compile. Prints errors if
@@ -231,7 +231,7 @@ class ExprToken : public Token {
   /**
    * The constant value of this expression, as known at compile-time.
    */
-  int _value;
+  uint16_t _value;
   /**
    * A list of tokens in this expression, in postfix notation.
    */
@@ -247,7 +247,7 @@ class ArrayExprToken : public Token {
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
-  int size() const { return _exprs.size(); }
+  size_t size() const { return _exprs.size(); }
   ExprToken get(int i) const { return _exprs[i]; }
  private:
   std::vector<ExprToken> _exprs;

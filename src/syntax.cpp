@@ -75,7 +75,7 @@ std::shared_ptr<GlobalVarToken> getGlobal(
  * is a bit crude.
  */
 bool isType(const std::string& type) {
-  return "void" == type || "int16" == type || "uint16" == type;
+  return "void" == type ||  "uint16" == type;
 }
 
 /**
@@ -202,7 +202,7 @@ bool OperatorToken::leftToRight() const {
   return isBinary();
 }
 
-int OperatorToken::operate(int lhs, int rhs) const {
+uint16_t OperatorToken::operate(uint16_t lhs, uint16_t rhs) const {
   if (isUnary()) {
     if ("-" == _op) {
       return -rhs;
@@ -477,7 +477,7 @@ void ExprToken::_evaluate() {
       } else {
         lhs = nullptr;
       }
-      int result;
+      uint16_t result;
       // If using assignment, dereferencing, or address-of, this
       // expression is not considered constant.
       if (("=" == op->str() && op->isBinary()) ||
@@ -493,7 +493,7 @@ void ExprToken::_evaluate() {
         if (!global->isArray()) {
           _const = false;
           return;
-        } else if (global->arraySize() <= rhs->val() || rhs->val() < 0) {
+        } else if (global->arraySize() <= rhs->val()) {
           _warn("Array index out of bounds in expression.", _lineNum);
           _const = false;
           return;
@@ -601,7 +601,7 @@ bool GlobalVarToken::parse(
         _error("Array size mismatch.", _type.line());
         return false;
       }
-      for (int i = 0; i < arrayExpr.size(); i++) {
+      for (size_t i = 0; i < arrayExpr.size(); i++) {
         ExprToken expr = arrayExpr.get(i);
         if (!expr.isConst()) {
           _error("Global value must be known at compile time.", expr.line());
@@ -625,7 +625,7 @@ bool GlobalVarToken::parse(
   } else if (";" == next.str()) {
     // No value supplied, give default value of 0.
     if (_type.isArray()) {
-      for (int i = 0; i < _type.arraySize(); i++) {
+      for (size_t i = 0; i < _type.arraySize(); i++) {
         _arrayValues.push_back(0);
       }
     } else {
