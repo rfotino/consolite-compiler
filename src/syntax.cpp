@@ -1258,6 +1258,12 @@ bool ForStatement::parse(
   return true;
 }
 
+/**
+ * While statements are of the form:
+ * "while (COND_EXPR) STMT"
+ * where COND_EXPR is an arbitrary expression and STMT is an
+ * arbitrary statement.
+ */
 bool WhileStatement::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
@@ -1266,19 +1272,41 @@ bool WhileStatement::parse(
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
       std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc) {
-  // TODO: Parse while statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  labels.size();
-  localVars.size();
-  currentFunc->name();
-  _error("While statement not yet implemented.", _lineNum);
-  return false;
+  // First token should be the "while" keyword.
+  if (!_expect(tokenizer, "while")) {
+    return false;
+  }
+  // Next token should be an open parenthesis.
+  if (!_expect(tokenizer, "(")) {
+    return false;
+  }
+  // Now we parse the conditional expression.
+  _condExpr = std::shared_ptr<ExprToken>(new ExprToken());
+  if (!_condExpr->parse(tokenizer, functions, globals,
+                        parameters, localVars)) {
+    return false;
+  }
+  // Next token should be a closing parenthesis.
+  if (!_expect(tokenizer, ")")) {
+    return false;
+  }
+  // Now we make sure the statement exists and is valid.
+  _body = StatementToken::parse(tokenizer, functions, globals,
+                                parameters, localVars, labels,
+                                currentFunc, true);
+  if (!_body) {
+    return false;
+  }
+  return true;
 }
 
+/**
+ * Do-while statements are of the form:
+ * "do STMT while (COND_EXPR);"
+ * where COND_EXPR is an arbitrary expression and STMT is an
+ * arbitrary statement.
+ */
 bool DoWhileStatement::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
@@ -1287,17 +1315,41 @@ bool DoWhileStatement::parse(
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
       std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc) {
-  // TODO: Parse do-while statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  labels.size();
-  localVars.size();
-  currentFunc->name();
-  _error("Do-while statement not yet implemented.", _lineNum);
-  return false;
+  // Make sure the first token is the "do" keyword.
+  if (!_expect(tokenizer, "do")) {
+    return false;
+  }
+  // Make sure the body exists and is valid.
+  _body = StatementToken::parse(tokenizer, functions, globals,
+                                parameters, localVars, labels,
+                                currentFunc, true);
+  if (!_body) {
+    return false;
+  }
+  // Next token should be the "while" keyword.
+  if (!_expect(tokenizer, "while")) {
+    return false;
+  }
+  // Next token should be an opening parenthesis.
+  if (!_expect(tokenizer, "(")) {
+    return false;
+  }
+  // Next we should be able to parse the expression.
+  _condExpr = std::shared_ptr<ExprToken>(new ExprToken());
+  if (!_condExpr->parse(tokenizer, functions, globals,
+                        parameters, localVars)) {
+    return false;
+  }
+  // Next two tokens should be a closing parenthesis followed by
+  // a semicolon.
+  if (!_expect(tokenizer, ")")) {
+    return false;
+  }
+  if (!_expect(tokenizer, ";")) {
+    return false;
+  }
+  return true;
 }
 
 bool BreakStatement::parse(Tokenizer *tokenizer, bool inLoop) {
