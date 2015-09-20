@@ -1099,15 +1099,21 @@ bool ExprStatement::parse(
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
-  // TODO: Parse expression statements.
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  localVars.size();
-  _error("Expression statement not yet implemented.", _lineNum);
-  return false;
+  // An expression statement is just an expression followed by a semicolon.
+  if (!_expr.parse(tokenizer, functions, globals, parameters, localVars)) {
+    return false;
+  }
+  AtomToken semicolon = tokenizer->getNext();
+  if (semicolon.str().empty()) {
+    _error("Unexpected EOF in expression statement.", semicolon.line());
+    return false;
+  } else if (";" != semicolon.str()) {
+    _error("Unexpected token '" + semicolon.str() + "', expected ';'.",
+           semicolon.line());
+    return false;
+  }
+  return true;
 }
 
 bool IfStatement::parse(
