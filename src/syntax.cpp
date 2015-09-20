@@ -134,6 +134,28 @@ void _warn(const std::string& msg, int lineNum) {
 }
 
 /**
+ * Consumes the next token, and prints an error message and returns
+ * false if it finds EOF or a token other than the one it was
+ * expecting. Returns true if the next token was the expected token.
+ */
+bool _expect(Tokenizer *tokenizer, const std::string& str, bool errors = true) {
+  AtomToken t = tokenizer->getNext();
+  if (t.str().empty()) {
+    if (errors) {
+      _error("Unexpected EOF, expected '" + str + "'.", t.line());
+    }
+    return false;
+  } else if (str != t.str()) {
+    if (errors) {
+      _error("Unexpected token '" + t.str() + "', expected '" + str + "'.",
+             t.line());
+    }
+    return false;
+  }
+  return true;
+}
+
+/**
  * Parses a literal value in the code, such as "0x00ff" or "1234".
  * Only hex and decimal formats supported currently, no string
  * literals. Only stores up to the maximum value of a signed int.
@@ -340,10 +362,7 @@ bool TypeToken::parse(
       return false;
     }
     _arraySize = expr.val();
-    AtomToken endBracket = tokenizer->getNext();
-    if ("]" != endBracket.str()) {
-      _error("Unexpected token '" + endBracket.str() + "', expected ']'.",
-             endBracket.line());
+    if (!_expect(tokenizer, "]")) {
       return false;
     }
   }
@@ -619,17 +638,11 @@ bool ArrayExprToken::parse(
       const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
       const std::vector<std::shared_ptr<ParamToken>>& parameters,
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
+  _lineNum = tokenizer->peekNext().line();
   // Make sure the first token is a '{' symbol
-  AtomToken first = tokenizer->getNext();
-  if (first.empty()) {
-    _error("Unexpected EOF.", first.line());
-    return false;
-  } else if ("{" != first.str()) {
-    _error("Unexpected token '" + first.str() + "', expected '{'.",
-           first.line());
+  if (!_expect(tokenizer, "{")) {
     return false;
   }
-  _lineNum = first.line();
   // Check if the next token is a closing brace, in which
   // case we don't need to check for expressions.
   if ("}" == tokenizer->peekNext().str()) {
@@ -790,6 +803,7 @@ bool FunctionToken::parse(
       Tokenizer *tokenizer,
       std::vector<std::shared_ptr<FunctionToken>>& functions,
       std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
+  _lineNum = _type.line();
   // Validate the name
   if (!isValidName(_name)) {
     _error("Invalid function name '" + _name + "'.", _type.line());
@@ -804,15 +818,9 @@ bool FunctionToken::parse(
     return false;
   }
   // Make sure the first token is an open parenthesis
-  AtomToken t = tokenizer->peekNext();
-  _lineNum = t.line();
-  if (t.str().empty()) {
-    _error("Unexpected EOF.", t.line());
-  } if ("(" != t.str()) {
-    _error("Unexpected token '" + t.str() + "', expected '('.", t.line());
+  if (!_expect(tokenizer, "(")) {
     return false;
   }
-  tokenizer->getNext();
   // Get the parameters
   while (")" != tokenizer->peekNext().str()) {
     std::shared_ptr<ParamToken> param(new ParamToken());
@@ -824,7 +832,7 @@ bool FunctionToken::parse(
       return false;
     }
     _parameters.push_back(param);
-    t = tokenizer->peekNext();
+    AtomToken t = tokenizer->peekNext();
     if (t.str().empty()) {
       _error("Unexpected EOF.", t.line());
       return false;
@@ -840,13 +848,8 @@ bool FunctionToken::parse(
   tokenizer->getNext();
   // Add self to the functions list
   functions.push_back(shared_from_this());
-  // Get the function body. Make sure it starts with a '}'.
-  t = tokenizer->getNext();
-  if (t.str().empty()) {
-    _error("Unexpected EOF.", t.line());
-    return false;
-  } else if ("{" != t.str()) {
-    _error("Unexpected token '" + t.str() + "', expected '{'.", t.line());
+  // Get the function body. Make sure it starts with a '{'.
+  if (!_expect(tokenizer, "{")) {
     return false;
   }
   // Get the statements within the function body.
@@ -980,15 +983,9 @@ bool CompoundStatement::parse(
       bool inLoop) {
   _lineNum = tokenizer->peekNext().line();
   // Make sure the first token is a '{'.
-  AtomToken t = tokenizer->peekNext();
-  if (t.str().empty()) {
-    _error("Unexpected EOF.", t.line());
-    return false;
-  } else if ("{" != t.str()) {
-    _error("Unexpected token '" + t.str() + "', expected '{'.", t.line());
+  if (!_expect(tokenizer, "{")) {
     return false;
   }
-  tokenizer->getNext();
   // Get the inner statements.
   while ("}" != tokenizer->peekNext().str()) {
     auto statement = StatementToken::parse(tokenizer, functions, globals,
@@ -1104,18 +1101,17 @@ bool ExprStatement::parse(
   if (!_expr.parse(tokenizer, functions, globals, parameters, localVars)) {
     return false;
   }
-  AtomToken semicolon = tokenizer->getNext();
-  if (semicolon.str().empty()) {
-    _error("Unexpected EOF in expression statement.", semicolon.line());
-    return false;
-  } else if (";" != semicolon.str()) {
-    _error("Unexpected token '" + semicolon.str() + "', expected ';'.",
-           semicolon.line());
+  if (!_expect(tokenizer, ";")) {
     return false;
   }
   return true;
 }
 
+/**
+ * An if statement looks like "if (COND_EXPR) TRUE_STMT [else FALSE_STMT]",
+ * where the else part is optional. COND_EXPR is an arbitrary expression,
+ * and TRUE_STMT and FALSE_STMT are both arbitrary statements.
+ */
 bool IfStatement::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
@@ -1125,18 +1121,46 @@ bool IfStatement::parse(
       std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc,
       bool inLoop) {
-  // TODO: Parse if statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  labels.size();
-  localVars.size();
-  currentFunc->name();
-  inLoop = inLoop;
-  _error("If statement not yet implemented.", _lineNum);
-  return false;
+  // Make sure it starts with "if"
+  if (!_expect(tokenizer, "if")) {
+    return false;
+  }
+  // Followed by an open parenthesis
+  if (!_expect(tokenizer, "(")) {
+    return false;
+  }
+  // Followed by a valid expression
+  if (!_condExpr.parse(tokenizer, functions, globals, parameters, localVars)) {
+    return false;
+  }
+  // Followed by a closing parenthesis
+  if (!_expect(tokenizer, ")")) {
+    return false;
+  }
+  // Followed by a valid statement
+  _trueStatement = StatementToken::parse(tokenizer, functions, globals,
+                                         parameters, localVars, labels,
+                                         currentFunc, inLoop);
+  if (!_trueStatement) {
+    return false;
+  }
+  // If the next token is "else", check for the else statement.
+  if ("else" == tokenizer->peekNext().str()) {
+    _hasElse = true;
+    // Consume the "else" token.
+    tokenizer->getNext();
+    // Make sure it is followed by a valid statement.
+    _falseStatement = StatementToken::parse(tokenizer, functions, globals,
+                                            parameters, localVars, labels,
+                                            currentFunc, inLoop);
+    if (!_falseStatement) {
+      return false;
+    }
+  } else {
+    _hasElse = false;
+  }
+  return true;
 }
 
 bool ForStatement::parse(

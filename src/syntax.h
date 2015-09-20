@@ -367,8 +367,8 @@ class IfStatement : public StatementToken {
              bool inLoop);
  private:
   ExprToken _condExpr;
-  StatementToken _trueStatement;
-  StatementToken _falseStatement;
+  std::shared_ptr<StatementToken> _trueStatement;
+  std::shared_ptr<StatementToken> _falseStatement;
   bool _hasElse;
 };
 
