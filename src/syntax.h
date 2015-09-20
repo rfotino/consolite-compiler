@@ -298,7 +298,7 @@ class CompoundStatement : public StatementToken {
              const std::shared_ptr<FunctionToken>& currentFunc,
              bool inLoop);
  private:
-  std::vector<StatementToken> _statements;
+  std::vector<std::shared_ptr<StatementToken>> _statements;
 };
 
 /**

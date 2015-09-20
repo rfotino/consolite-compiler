@@ -928,18 +928,37 @@ bool CompoundStatement::parse(
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
       const std::shared_ptr<FunctionToken>& currentFunc,
       bool inLoop) {
-  // TODO: Parse compound statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  labels.size();
-  localVars.size();
-  currentFunc->name();
-  inLoop = inLoop;
-  _error("Compound statement not yet implemented.", _lineNum);
-  return false;
+  // Make sure the first token is a '{'.
+  AtomToken t = tokenizer->peekNext();
+  if (t.str().empty()) {
+    _error("Unexpected EOF.", t.line());
+    return false;
+  } else if ("{" != t.str()) {
+    _error("Unexpected token '" + t.str() + "', expected '{'.", t.line());
+    return false;
+  }
+  tokenizer->getNext();
+  // Get the inner statements.
+  while ("}" != tokenizer->peekNext().str()) {
+    auto statement = StatementToken::parse(tokenizer, functions, globals,
+                                           parameters, labels, localVars,
+                                           currentFunc, inLoop);
+    if (!statement) {
+      return false;
+    }
+    // Local variables are only allowed as top level statements in
+    // a function.
+    if (typeid(*statement) == typeid(LocalVarToken)) {
+      _error("Local variables can only be declared as top level "
+             "statements in a function.", statement->line());
+      return false;
+    }
+    _statements.push_back(statement);
+  }
+  // Consume the final '}' token.
+  tokenizer->getNext();
+  return true;
 }
 
 bool LocalVarToken::parse(
