@@ -217,6 +217,7 @@ class FunctionToken : public Token,
 class ExprToken : public Token {
  public:
   ExprToken() : _const(true), _value(0) { }
+  ExprToken(uint16_t value);
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
@@ -376,9 +377,9 @@ class IfStatement : public StatementToken {
  * A token representing a generic loop.
  */
 class LoopStatement : public StatementToken {
- private:
-  ExprToken _condExpr;
-  StatementToken _body;
+ protected:
+  std::shared_ptr<ExprToken> _condExpr;
+  std::shared_ptr<StatementToken> _body;
 };
 
 /**
@@ -394,8 +395,8 @@ class ForStatement : public LoopStatement {
              std::vector<std::shared_ptr<LabelStatement>>& labels,
              const std::shared_ptr<FunctionToken>& currentFunc);
  private:
-  ExprToken _initExpr;
-  ExprToken _loopExpr;
+  std::vector<std::shared_ptr<ExprToken>> _initExprs;
+  std::vector<std::shared_ptr<ExprToken>> _loopExprs;
 };
 
 /**

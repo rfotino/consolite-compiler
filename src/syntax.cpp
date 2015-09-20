@@ -370,6 +370,13 @@ bool TypeToken::parse(
 }
 
 /**
+ * Constructs an expression token that represents a constant value.
+ */
+ExprToken::ExprToken(uint16_t value) : _const(true), _value(value) {
+  _postfix.push_back(std::shared_ptr<Token>(new LiteralToken(value)));
+}
+
+/**
  * Parses an expression from infix to postfix notation, then validates it,
  * then evaluates the expression if it can be known at compile time. Returns
  * false if there is anything wrong with the expression. Sets the _const and
@@ -1163,6 +1170,13 @@ bool IfStatement::parse(
   return true;
 }
 
+/**
+ * A for-statement is of the form:
+ * "for (INIT_LIST; COND_EXPR; LOOP_LIST) STMT"
+ * Where INIT_LIST and LOOP_LIST are comma-separated lists of
+ * expressions, COND_EXPR is a single expression, and STMT is
+ * an arbitrary statement.
+ */
 bool ForStatement::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
@@ -1171,17 +1185,77 @@ bool ForStatement::parse(
       const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
       std::vector<std::shared_ptr<LabelStatement>>& labels,
       const std::shared_ptr<FunctionToken>& currentFunc) {
-  // TODO: Parse for statements
   _lineNum = tokenizer->peekNext().line();
-  tokenizer = tokenizer;
-  functions.size();
-  globals.size();
-  parameters.size();
-  labels.size();
-  localVars.size();
-  currentFunc->name();
-  _error("For statement not yet implemented.", _lineNum);
-  return false;
+  // Start with the "for" keyword.
+  if (!_expect(tokenizer, "for")) {
+    return false;
+  }
+  // Next get the "(" token.
+  if (!_expect(tokenizer, "(")) {
+    return false;
+  }
+  // Get the INIT_LIST.
+  if (";" != tokenizer->peekNext().str()) {
+    while (true) {
+      std::shared_ptr<ExprToken> expr(new ExprToken());
+      if (!expr->parse(tokenizer, functions, globals, parameters, localVars)) {
+        return false;
+      }
+      _initExprs.push_back(expr);
+      // If the next token is not a comma, we are done. Otherwise consume
+      // the comma and continue.
+      if ("," != tokenizer->peekNext().str()) {
+        break;
+      }
+      tokenizer->getNext();
+    }
+  }
+  // Make sure the INIT_LIST ended with a ';'.
+  if (!_expect(tokenizer, ";")) {
+    return false;
+  }
+  // Get the COND_EXPR. If the next token is a ';', then the COND_EXPR
+  // is an implicit truthy value.
+  if (";" == tokenizer->peekNext().str()) {
+    _condExpr = std::shared_ptr<ExprToken>(new ExprToken(1));
+  } else {
+    _condExpr = std::shared_ptr<ExprToken>(new ExprToken());
+    if (!_condExpr->parse(tokenizer, functions, globals,
+                          parameters, localVars)) {
+      return false;
+    }
+  }
+  // Make sure the COND_EXPR ended with a ';'.
+  if (!_expect(tokenizer, ";")) {
+    return false;
+  }
+  // Get the LOOP_LIST.
+  if (")" != tokenizer->peekNext().str()) {
+    while (true) {
+      std::shared_ptr<ExprToken> expr(new ExprToken());
+      if (!expr->parse(tokenizer, functions, globals, parameters, localVars)) {
+        return false;
+      }
+      _loopExprs.push_back(expr);
+      // If the next token is not a comma, we are done. Otherwise consume
+      // the comma and continue.
+      if ("," != tokenizer->peekNext().str()) {
+        break;
+      }
+      tokenizer->getNext();
+    }
+  }
+  // Make sure the LOOP_LIST ended with a ')'.
+  if (!_expect(tokenizer, ")")) {
+    return false;
+  }
+  // Get the statement that is the body of the loop, make sure it is valid.
+  _body = StatementToken::parse(tokenizer, functions, globals, parameters,
+                                localVars, labels, currentFunc, true);
+  if (!_body) {
+    return false;
+  }
+  return true;
 }
 
 bool WhileStatement::parse(
