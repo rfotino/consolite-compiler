@@ -6,6 +6,74 @@
 #include <iostream>
 #include "parser.h"
 
+Parser::Parser(Tokenizer *t) : _tokenizer(t) {
+  // Add builtin "void COLOR(uint16 color)" function.
+  _functions.push_back(
+    std::make_shared<FunctionToken>(
+      FunctionToken(
+        TypeToken("void"),
+        "COLOR",
+        {
+          std::make_shared<ParamToken>(
+            ParamToken(TypeToken("uint16"), "color")
+          )
+        }
+      )
+    )
+  );
+  // Add builtin "void PIXEL(uint16 x, uint16 y)" function.
+  _functions.push_back(
+    std::make_shared<FunctionToken>(
+      FunctionToken(
+        TypeToken("void"),
+        "PIXEL",
+        {
+          std::make_shared<ParamToken>(
+            ParamToken(TypeToken("uint16"), "x")
+          ),
+          std::make_shared<ParamToken>(
+            ParamToken(TypeToken("uint16"), "y")
+          )
+        }
+      )
+    )
+  );
+  // Add builtin "void TIMERST()" function.
+  _functions.push_back(
+    std::make_shared<FunctionToken>(
+      FunctionToken(
+        TypeToken("void"),
+        "TIMERST",
+        { }
+      )
+    )
+  );
+  // Add builtin "uint16 TIME()" function.
+  _functions.push_back(
+    std::make_shared<FunctionToken>(
+      FunctionToken(
+        TypeToken("uint16"),
+        "TIME",
+        { }
+      )
+    )
+  );
+  // Add builtin "uint16 INPUT(uint16 input_id)" function.
+  _functions.push_back(
+    std::make_shared<FunctionToken>(
+      FunctionToken(
+        TypeToken("uint16"),
+        "INPUT",
+        {
+          std::make_shared<ParamToken>(
+            ParamToken(TypeToken("uint16"), "input_id")
+          )
+        }
+      )
+    )
+  );
+}
+
 bool Parser::parse() {
   bool error = false;
   while (true) {

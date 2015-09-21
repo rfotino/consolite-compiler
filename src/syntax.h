@@ -131,6 +131,8 @@ class OperatorToken : public Token {
 class TypeToken : public Token {
  public:
   TypeToken() : _isArray(false), _arraySize(-1) { }
+  TypeToken(const std::string& name, bool isArray = false, size_t arraySize = 0)
+    : _name(name), _isArray(isArray), _arraySize(arraySize) { }
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
@@ -176,6 +178,9 @@ class GlobalVarToken : public Token {
  */
 class ParamToken : public Token {
  public:
+  ParamToken() { }
+  ParamToken(const TypeToken& type, const std::string& name)
+    : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
@@ -194,6 +199,9 @@ class ParamToken : public Token {
 class FunctionToken : public Token,
                       public std::enable_shared_from_this<FunctionToken> {
  public:
+  FunctionToken(const TypeToken& type, const std::string& name,
+                const std::vector<std::shared_ptr<ParamToken>>& params)
+    : _type(type), _name(name), _parameters(params) { }
   FunctionToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
   bool parse(Tokenizer *tokenizer,

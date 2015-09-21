@@ -11,7 +11,7 @@
 
 class Parser {
  public:
-  Parser(Tokenizer *t) : _tokenizer(t) { }
+  Parser(Tokenizer *t);
   /**
    * Parses the tokens from the Tokenizer into an abstract syntax tree.
    * Returns false if there were errors found in the source code.
