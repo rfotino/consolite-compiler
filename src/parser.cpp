@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include "parser.h"
+#include "util.h"
 
 Parser::Parser(Tokenizer *t) : _tokenizer(t) {
   // Add builtin "void COLOR(uint16 color)" function.
@@ -75,7 +76,6 @@ Parser::Parser(Tokenizer *t) : _tokenizer(t) {
 }
 
 bool Parser::parse() {
-  bool error = false;
   while (true) {
     // Get the type
     if (_tokenizer->peekNext().empty()) {
@@ -84,37 +84,41 @@ bool Parser::parse() {
     }
     TypeToken type;
     if (!type.parse(_tokenizer, _functions, _globals)) {
-      error = true;
-      break;
+      return false;
     }
 
     // Get the name
     AtomToken name = _tokenizer->getNext();
     if (name.empty()) {
-      error = true;
       std::cerr << "Error: Unexpected EOF, expected global or function name."
                 << std::endl;
-      break;
+      return false;
     }
 
     // Differentiate between function and global variable
     if ("(" == _tokenizer->peekNext().str()) {
       std::shared_ptr<FunctionToken> func(new FunctionToken(type, name.str()));
       if (!func->parse(_tokenizer, _functions, _globals)) {
-        error = true;
-        break;
+        return false;
       }
       _functions.push_back(func);
     } else {
       std::shared_ptr<GlobalVarToken> var(new GlobalVarToken(type, name.str()));
       if (!var->parse(_tokenizer, _functions, _globals)) {
-        error = true;
-        break;
+        return false;
       }
       _globals.push_back(var);
     }
   }
-  return !error;
+  // Make sure there is a 'void main()' function, which is the entry point.
+  auto entryPoint = getFunction("main", _functions);
+  if (!entryPoint ||
+      "void" != entryPoint->type().name() ||
+      0 != entryPoint->numParams()) {
+    std::cerr << "Error: No 'void main()' entry point found." << std::endl;
+    return false;
+  }
+  return true;
 }
 
 void Parser::output(char *filename) {
