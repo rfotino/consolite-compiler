@@ -898,6 +898,11 @@ bool FunctionToken::parse(
       std::vector<std::shared_ptr<FunctionToken>>& functions,
       std::vector<std::shared_ptr<GlobalVarToken>>& globals) {
   _lineNum = _type.line();
+  // Validate the type
+  if (_type.isArray()) {
+    _error("Function return type cannot be array-valued.", _type.line());
+    return false;
+  }
   // Validate the name
   if (!isValidName(_name)) {
     _error("Invalid function name '" + _name + "'.", _type.line());
@@ -1180,7 +1185,8 @@ bool LocalVarToken::parse(
     } else {
       // Not an array value, get the singleton initialization expression
       std::shared_ptr<ExprToken> expr(new ExprToken());
-      if (!expr->parse(tokenizer, functions, globals)) {
+      if (!expr->parse(tokenizer, functions, globals,
+                       parameters, localVars)) {
         return false;
       }
       _initExprs.push_back(expr);
