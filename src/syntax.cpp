@@ -901,6 +901,8 @@ bool ParamToken::parse(
 
 /**
  * Parses a function's parameter signature and the function body.
+ *
+ * TODO: Allow function definitions.
  */
 bool FunctionToken::parse(
       Tokenizer *tokenizer,
@@ -960,21 +962,30 @@ bool FunctionToken::parse(
   if (!_expect(tokenizer, "{")) {
     return false;
   }
-  // Get the statements within the function body.
+  // Get the statements within the function body. Local variable
+  // declarations must come before any other statements.
+  bool inDeclarations = true;
   while ("}" != tokenizer->peekNext().str()) {
     auto statement = StatementToken::parse(tokenizer, functions, globals,
                                            _parameters, _localVars, _labels,
                                            _gotos, shared_from_this());
-    // If the statement is valid, add it to the list of statements.
     if (!statement) {
       return false;
     }
-    _statements.push_back(statement);
     // If it's a local variable declaration, add it to the list of local
     // variables.
     if (typeid(*statement) == typeid(LocalVarToken)) {
+      if (!inDeclarations) {
+        _error("Declarations must come before other "
+               "statements in function '" + _name + "()'.",
+               statement->line());
+        return false;
+      }
       _localVars.push_back(std::dynamic_pointer_cast<LocalVarToken>(statement));
+    } else {
+      inDeclarations = false;
     }
+    _statements.push_back(statement);
     // Check for EOF
     AtomToken t = tokenizer->peekNext();
     if (t.str().empty()) {
