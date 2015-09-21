@@ -379,6 +379,20 @@ class ExprStatement : public StatementToken {
 };
 
 /**
+ * A token representing a void function call followed by a semicolon.
+ */
+class VoidStatement : public StatementToken {
+ public:
+  bool parse(Tokenizer *tokenizer,
+             const std::vector<std::shared_ptr<FunctionToken>>& functions,
+             const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+             const std::vector<std::shared_ptr<ParamToken>>& parameters,
+             const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+ private:
+  FunctionCallToken _fnCall;
+};
+
+/**
  * A token representing a null statement, which is simply a ';' token.
  */
 class NullStatement : public StatementToken {

@@ -500,6 +500,15 @@ bool ExprToken::parse(
         _postfix.push_back(localVar);
         prev = "val";
       } else if (nullptr != function) {
+        // If the function returns void, this is an error. We can't have
+        // void functions mixed in with expressions.
+        if ("void" == function->type().name()) {
+          _error("Function call to 'void " + function->name() + "()' not "
+                 "allowed in expression.",
+                 t.line());
+          return false;
+        }
+        // If it is not void, parse the function call.
         std::shared_ptr<FunctionCallToken> fnCall(new FunctionCallToken());
         if (!fnCall->parse(tokenizer, functions, globals,
                            parameters, localVars)) {
@@ -1003,6 +1012,7 @@ std::shared_ptr<StatementToken> StatementToken::parse(
       const std::shared_ptr<FunctionToken>& currentFunc,
       bool inLoop) {
   AtomToken t = tokenizer->peekNext();
+  auto function = getFunction(t.str(), functions);
   if (t.str().empty()) {
     _error("Unexpected EOF.", t.line());
     return nullptr;
@@ -1073,6 +1083,12 @@ std::shared_ptr<StatementToken> StatementToken::parse(
     std::shared_ptr<LocalVarToken> localVar(new LocalVarToken());
     if (localVar->parse(tokenizer, functions, globals, parameters, localVars)) {
       return localVar;
+    }
+  } else if (nullptr != function && "void" == function->type().name()) {
+    std::shared_ptr<VoidStatement> voidStatement(new VoidStatement());
+    if (voidStatement->parse(tokenizer, functions, globals, parameters,
+                             localVars)) {
+      return voidStatement;
     }
   } else {
     std::shared_ptr<ExprStatement> exprStatement(new ExprStatement());
@@ -1204,6 +1220,11 @@ bool LocalVarToken::parse(
   return true;
 }
 
+/**
+ * An expression statement has an expression followed by a semicolon.
+ * This could include assignment, function calls, etc. Does not include
+ * void function calls, they must be their own statement type, VoidStatement.
+ */
 bool ExprStatement::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
@@ -1215,6 +1236,34 @@ bool ExprStatement::parse(
   if (!_expr.parse(tokenizer, functions, globals, parameters, localVars)) {
     return false;
   }
+  if (!_expect(tokenizer, ";")) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * A void statement is a function call that returns void, followed by
+ * a semicolon.
+ */
+bool VoidStatement::parse(
+      Tokenizer *tokenizer,
+      const std::vector<std::shared_ptr<FunctionToken>>& functions,
+      const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
+      const std::vector<std::shared_ptr<ParamToken>>& parameters,
+      const std::vector<std::shared_ptr<LocalVarToken>>& localVars) {
+  _lineNum = tokenizer->peekNext().line();
+  // Parse the function call.
+  if (!_fnCall.parse(tokenizer, functions, globals, parameters, localVars)) {
+    return false;
+  }
+  // Make sure the function call is void.
+  auto function = getFunction(_fnCall.funcName(), functions);
+  if (!function || "void" != function->type().name()) {
+    _error("Expected function call to be of type 'void'.", _lineNum);
+    return false;
+  }
+  // Make sure the next symbol is a semicolon.
   if (!_expect(tokenizer, ";")) {
     return false;
   }
