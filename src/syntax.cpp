@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <regex>
+#include "parser.h"
 #include "tokenizer.h"
 #include "syntax.h"
 #include "util.h"
@@ -698,6 +699,14 @@ bool GlobalVarToken::parse(
 }
 
 /**
+ * Output assembly code for this global variable declaration.
+ */
+void GlobalVarToken::output(Parser *parser) {
+  // TODO: Implement global variable assembly output.
+  parser->writeln(_name + ":");
+}
+
+/**
  * Parses out a type and a name for the parameter, making sure
  * the type is appropriate for a parameter and the name doesn't
  * conflict with a function or global variable name.
@@ -845,6 +854,14 @@ bool FunctionToken::parse(
     }
   }
   return ret;
+}
+
+/**
+ * Outputs assembly code for this function.
+ */
+void FunctionToken::output(Parser *parser) {
+  // TODO: Implement function assembly output.
+  parser->writeln(_name + ":");
 }
 
 /**

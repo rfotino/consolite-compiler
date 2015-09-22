@@ -81,12 +81,12 @@ bool isType(const std::string& type);
 /**
  * Prints an error message with the given line number.
  */
-void _error(const std::string& msg, int lineNum);
+void _error(const std::string& msg, int lineNum = -1);
 
 /**
  * Prints a warning message with the given line number.
  */
-void _warn(const std::string& msg, int lineNum);
+void _warn(const std::string& msg, int lineNum = -1);
 
 /**
  * Consumes the next token, and prints an error message and returns

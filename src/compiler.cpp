@@ -25,9 +25,11 @@ int main(int argc, char **argv) {
       return 1;
     }
     // Compiles the syntax tree to the output file
-    parser.output(argv[2]);
+    if (!parser.output(argv[2])) {
+      return 1;
+    }
   } catch (char const *error) {
-    std::cout << error << std::endl;
+    std::cout << "Error: " << error << std::endl;
     return 1;
   }
 

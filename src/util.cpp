@@ -136,14 +136,22 @@ bool isType(const std::string& type) {
 void _error(const std::string& msg, int lineNum) {
   // TODO: It would be nice to have error messages that showed you
   // the source line and pointed to the token causing an error.
-  std::cerr << "Error:" << lineNum << ": " << msg << std::endl;
+  std::cerr << "Error:";
+  if (0 < lineNum) {
+    std::cerr << lineNum << ":";
+  }
+  std::cerr << " " << msg << std::endl;
 }
 
 /**
  * Prints a warning message with the given line number.
  */
 void _warn(const std::string& msg, int lineNum) {
-  std::cerr << "Warning:" << lineNum << ": " << msg << std::endl;
+  std::cerr << "Warning:";
+  if (0 < lineNum) {
+    std::cerr << lineNum << ":";
+  }
+  std::cerr << " " << msg << std::endl;
 }
 
 /**

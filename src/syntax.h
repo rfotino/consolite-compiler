@@ -11,9 +11,10 @@
 #include <memory>
 #include <stack>
 
-// Forward declaration, some tokens take a pointer to a tokenizer as an
-// argument to parse().
+// Forward declaration, some tokens take a pointer to a tokenizer or
+// parser as an argument.
 class Tokenizer;
+class Parser;
 
 /**
  * The base class for all syntax tokens, has a line number and an
@@ -157,9 +158,17 @@ class GlobalVarToken : public Token {
  public:
   GlobalVarToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
+  /**
+   * Parses out a global variable declaration from source code
+   * and validates it.
+   */
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
+  /**
+   * Outputs assembly code for this global variable declaration.
+   */
+  void output(Parser *parser);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
   uint16_t val() const { return _value; }
@@ -204,9 +213,17 @@ class FunctionToken : public Token,
     : _type(type), _name(name), _parameters(params) { }
   FunctionToken(const TypeToken& type, const std::string& name)
     : _type(type), _name(name) { }
+  /**
+   * Parses source code for a function and validates it. Returns false
+   * if there are errors in parsing the function.
+   */
   bool parse(Tokenizer *tokenizer,
              std::vector<std::shared_ptr<FunctionToken>>& functions,
              std::vector<std::shared_ptr<GlobalVarToken>>& globals);
+  /**
+   * Outputs assembly code for this function.
+   */
+  void output(Parser *parser);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
   size_t numParams() const { return _parameters.size(); }

@@ -90,8 +90,7 @@ bool Parser::parse() {
     // Get the name
     AtomToken name = _tokenizer->getNext();
     if (name.empty()) {
-      std::cerr << "Error: Unexpected EOF, expected global or function name."
-                << std::endl;
+      _error("Error: Unexpected EOF, expected global or function name.");
       return false;
     }
 
@@ -101,7 +100,6 @@ bool Parser::parse() {
       if (!func->parse(_tokenizer, _functions, _globals)) {
         return false;
       }
-      _functions.push_back(func);
     } else {
       std::shared_ptr<GlobalVarToken> var(new GlobalVarToken(type, name.str()));
       if (!var->parse(_tokenizer, _functions, _globals)) {
@@ -115,13 +113,52 @@ bool Parser::parse() {
   if (!entryPoint ||
       "void" != entryPoint->type().name() ||
       0 != entryPoint->numParams()) {
-    std::cerr << "Error: No 'void main()' entry point found." << std::endl;
+    _error("No 'void main()' entry point found.");
     return false;
   }
   return true;
 }
 
-void Parser::output(char *filename) {
-  std::cerr << "Error: Parser::output() not yet implemented. Output file '"
-            << filename << "' is unchanged." << std::endl;
+bool Parser::output(char *filename) {
+  // Start by opening the output file.
+  _outfile.open(filename, std::ofstream::out | std::ofstream::trunc);
+  if (!_outfile.good()) {
+    _error("Unable to open output file.");
+    return false;
+  }
+  // Next assign labels for all globals and functions.
+  for (auto global : _globals) {
+    this->addLabel(global->name());
+  }
+  for (auto function : _functions) {
+    this->addLabel(function->name());
+  }
+  // Output the "bootloader".
+  this->writeln("JMPI main");
+  // Output global variables.
+  for (auto global : _globals) {
+    global->output(this);
+  }
+  // Output functions.
+  for (auto function: _functions) {
+    function->output(this);
+  }
+  return true;
+}
+
+bool Parser::hasLabel(const std::string& label) {
+  return 0 < _assignedLabels.count(label);
+}
+
+bool Parser::addLabel(const std::string& label) {
+  if (this->hasLabel(label)) {
+    return false;
+  }
+  _assignedLabels.insert(label);
+  return true;
+}
+
+void Parser::writeln(const std::string& line) {
+  std::cout << line << std::endl;
+  _outfile << line << std::endl;
 }
