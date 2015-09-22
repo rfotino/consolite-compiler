@@ -610,6 +610,14 @@ bool FunctionCallToken::parse(
            _lineNum);
     return false;
   }
+  // Make sure this is not a call to "void main()", which is illegal.
+  if ("main" == function->name() && "void" == function->type().name() &&
+      0 == function->numParams()) {
+    _error("Illegal call to 'void main()', the entry point cannot be called "
+	   "from within the program.",
+	   _lineNum);
+    return false;
+  }
   return true;
 }
 
