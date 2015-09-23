@@ -7,6 +7,20 @@
 #include "util.h"
 
 /**
+ * Returns a 4-digit hex string of the form "0x0000"
+ * from the given unsigned 16-bit value.
+ */
+std::string toHexStr(uint16_t value) {
+  std::string str;
+  for (int i = 0; i < 4; i++) {
+    uint8_t next = value & 0xf;
+    value >>= 4;
+    str = (char)(next <= 9 ? '0' + next : 'a' - 10 + next) + str;
+  }
+  return "0x" + str;
+}
+
+/**
  * Returns the opposing paranthesis for (), [], or {} pairs.
  * Returns an empty string if the input is not one of the above.
  */

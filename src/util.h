@@ -10,6 +10,16 @@
 #include "tokenizer.h"
 #include "syntax.h"
 
+#define ADDRESS_SIZE 2
+#define DATA_SIZE    2
+#define INST_SIZE    4
+
+/**
+ * Returns a 4-digit hex string of the form "0x0000"
+ * from the given unsigned 16-bit value.
+ */
+std::string toHexStr(uint16_t value);
+
 /**
  * Returns the opposing paranthesis for (), [], or {} pairs.
  * Returns an empty string if the input is not one of the above.

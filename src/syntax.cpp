@@ -710,8 +710,25 @@ bool GlobalVarToken::parse(
  * Output assembly code for this global variable declaration.
  */
 void GlobalVarToken::output(Parser *parser) {
-  // TODO: Implement global variable assembly output.
+  // Write out a label for the global variable.
   parser->writeln(_name + ":");
+  if (_type.isArray()) {
+    // The address for the array's elements will be the current byte
+    // position plus the instruction size.
+    parser->writeData(toHexStr(parser->getBytePos() + INST_SIZE), 1);
+    // Write out the array's elements as hex values.
+    std::string dataOutput;
+    for (size_t i = 0; i < _arrayValues.size(); i++) {
+      dataOutput += toHexStr(_arrayValues[i]);
+      if (i + 1 < _arrayValues.size()) {
+        dataOutput += " ";
+      }
+    }
+    parser->writeData(dataOutput, _arrayValues.size());
+  } else {
+    // Not an array, just write out the single hex value.
+    parser->writeData(toHexStr(_value), 1);
+  }
 }
 
 /**

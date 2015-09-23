@@ -7,7 +7,7 @@
 #include "parser.h"
 #include "util.h"
 
-Parser::Parser(Tokenizer *t) : _tokenizer(t) {
+Parser::Parser(Tokenizer *t) : _tokenizer(t), _bytePos(0) {
   // Add builtin "void COLOR(uint16 color)" function.
   _functions.push_back(
     std::make_shared<FunctionToken>(
@@ -134,7 +134,7 @@ bool Parser::output(char *filename) {
     this->addLabel(function->name());
   }
   // Output the "bootloader".
-  this->writeln("JMPI main");
+  this->writeInst("JMPI main");
   // Output global variables.
   for (auto global : _globals) {
     global->output(this);
@@ -156,6 +156,32 @@ bool Parser::addLabel(const std::string& label) {
   }
   _assignedLabels.insert(label);
   return true;
+}
+
+std::string Parser::getUnusedLabel(const std::string& label) {
+  if (!this->hasLabel(label)) {
+    this->addLabel(label);
+    return label;
+  }
+  int i = 1;
+  while (this->hasLabel(label + std::to_string(i))) {
+    i++;
+  }
+  this->addLabel(label + std::to_string(i));
+  return label + std::to_string(i);
+}
+
+void Parser::writeInst(const std::string& inst) {
+  this->writeln("        " + inst);
+  _bytePos += INST_SIZE;
+}
+
+void Parser::writeData(const std::string& data, int dataLength) {
+  this->writeln("        " + data);
+  _bytePos += dataLength * DATA_SIZE;
+  while (0 != _bytePos % INST_SIZE) {
+    _bytePos++;
+  }
 }
 
 void Parser::writeln(const std::string& line) {

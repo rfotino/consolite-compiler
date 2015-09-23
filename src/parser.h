@@ -34,9 +34,27 @@ class Parser {
    */
   bool addLabel(const std::string& label);
   /**
+   * Returns a valid, unused label that includes the given base label.
+   */
+  std::string getUnusedLabel(const std::string& base);
+  /**
+   * Writes an instruction to the outfile and increases the byte count of
+   * the output by the instruction length.
+   */
+  void writeInst(const std::string& inst);
+  /**
+   * Writes some data to the outfile and increases the byte count of the
+   * output.
+   */
+  void writeData(const std::string& data, int dataLength);
+  /**
    * Writes a line of output to the outfile.
    */
   void writeln(const std::string& line);
+  /**
+   * Gets the current byte position of the output.
+   */
+  uint16_t getBytePos() const { return _bytePos; }
 
  private:
   Tokenizer *_tokenizer;
@@ -48,6 +66,11 @@ class Parser {
    * These are saved so that we don't have conflicting label names.
    */
   std::unordered_set<std::string> _assignedLabels;
+  /**
+   * The current byte count of the output. Used to know the current
+   * address.
+   */
+  uint16_t _bytePos;
 };
 
 #endif
