@@ -133,8 +133,17 @@ bool Parser::output(char *filename) {
   for (auto function : _functions) {
     this->addLabel(function->name());
   }
-  // Output the "bootloader".
-  this->writeInst("JMPI main");
+  // Output the "bootloader". This sets the stack pointer, calls main,
+  // then goes into an infinite loop to prevent attempting to execute
+  // code that wasn't meant to be executed.
+  std::string stackLabel = this->getUnusedLabel("stack");
+  this->addLabel(stackLabel);
+  this->writeInst("MOVI SP " + stackLabel);
+  this->writeInst("CALL main");
+  std::string finishedLabel = this->getUnusedLabel("program_finished");
+  this->addLabel(finishedLabel);
+  this->writeln(finishedLabel + ":");
+  this->writeInst("JMPI " + finishedLabel);
   // Output global variables.
   for (auto global : _globals) {
     global->output(this);
@@ -143,6 +152,8 @@ bool Parser::output(char *filename) {
   for (auto function: _functions) {
     function->output(this);
   }
+  // Output the stack position.
+  this->writeln(stackLabel + ":");
   return true;
 }
 
