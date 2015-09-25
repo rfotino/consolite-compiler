@@ -149,15 +149,63 @@ class TypeToken : public Token {
 };
 
 /**
+ * A class for storing information about a variable, such as the type,
+ * name, and location as a register or frame offset.
+ */
+class Variable {
+ public:
+  Variable() { }
+  Variable(const TypeToken& type, const std::string& name)
+    : _type(type), _name(name) { }
+  TypeToken type() const { return _type; }
+  std::string name() const { return _name; }
+  /**
+   * Returns true if the variable's location is stored in a register.
+   */
+  bool isReg() const { return _reg.empty(); }
+  /**
+   * Returns the assembly code representation of this register, like "A".
+   */
+  std::string getReg() const { return _reg; }
+  /**
+   * Sets the assembly code representation of this register, like "A".
+   */
+  void setReg(const std::string& reg) { _reg = reg; }
+  /**
+   * Returns the offset from the frame pointer in bytes at which this
+   * variable is stored.
+   */
+  int getOffset() const { return _offset; }
+  /**
+   * Sets the offset from the frame pointer in bytes at which this
+   * variable is stored.
+   */
+  void setOffset(int offset) { _offset = offset; }
+ protected:
+  TypeToken _type;
+  std::string _name;
+  /**
+   * The assembly code representation of this register, or the empty
+   * string if it is not stored in a register.
+   */
+  std::string _reg;
+  /**
+   * The offset from the frame pointer in bytes at which this variable
+   * is stored, if it is not in a register.
+   */
+  int _offset;
+};
+
+/**
  * A token representing a global variable. This includes the name, type,
  * and initial value of the global. The parse() function is for parsing
  * declarations like "uint16[3] glob = { 1, 2, 3 };" when we are in
  * the global scope.
  */
-class GlobalVarToken : public Token {
+class GlobalVarToken : public Token, public Variable {
  public:
   GlobalVarToken(const TypeToken& type, const std::string& name)
-    : _type(type), _name(name) { }
+    : Variable(type, name) { }
   /**
    * Parses out a global variable declaration from source code
    * and validates it.
@@ -169,15 +217,11 @@ class GlobalVarToken : public Token {
    * Outputs assembly code for this global variable declaration.
    */
   void output(Parser *parser);
-  TypeToken type() const { return _type; }
-  std::string name() const { return _name; }
   uint16_t val() const { return _value; }
   bool isArray() const { return _type.isArray(); }
   uint16_t arraySize() const { return _arrayValues.size(); }
   uint16_t arrayVal(int i) const { return _arrayValues.at(i); }
  private:
-  TypeToken _type;
-  std::string _name;
   uint16_t _value;
   std::vector<uint16_t> _arrayValues;
 };
@@ -185,19 +229,14 @@ class GlobalVarToken : public Token {
 /**
  * A token representing a type and a name of a parameter for a function.
  */
-class ParamToken : public Token {
+class ParamToken : public Token, public Variable {
  public:
   ParamToken() { }
   ParamToken(const TypeToken& type, const std::string& name)
-    : _type(type), _name(name) { }
+    : Variable(type, name) { }
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals);
-  TypeToken type() const { return _type; }
-  std::string name() const { return _name; }
- private:
-  TypeToken _type;
-  std::string _name;
 };
 
 /**
@@ -236,6 +275,7 @@ class FunctionToken : public Token,
   std::vector<std::shared_ptr<LabelStatement>> _labels;
   std::vector<std::shared_ptr<GotoStatement>> _gotos;
   std::vector<std::shared_ptr<StatementToken>> _statements;
+  std::stack<std::string> _savedRegisters;
 };
 
 /**
@@ -360,17 +400,14 @@ class CompoundStatement : public StatementToken {
 /**
  * A token that represents a local variable declaration.
  */
-class LocalVarToken : public StatementToken {
+class LocalVarToken : public StatementToken, public Variable {
  public:
   bool parse(Tokenizer *tokenizer,
              const std::vector<std::shared_ptr<FunctionToken>>& functions,
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
-  std::string name() const { return _name; }
  private:
-  TypeToken _type;
-  std::string _name;
   /**
    * The initialization expressions. This will be an empty vector
    * if there was no initialization, or a single value if _type is

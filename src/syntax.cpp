@@ -857,8 +857,8 @@ bool FunctionToken::parse(
       _localVars.push_back(std::dynamic_pointer_cast<LocalVarToken>(statement));
     } else {
       inDeclarations = false;
+      _statements.push_back(statement);
     }
-    _statements.push_back(statement);
     // Check for EOF
     AtomToken t = tokenizer->peekNext();
     if (t.str().empty()) {
@@ -885,8 +885,82 @@ bool FunctionToken::parse(
  * Outputs assembly code for this function.
  */
 void FunctionToken::output(Parser *parser) {
-  // TODO: Implement function assembly output.
+  // Check if this is a builtin function, in which case we should
+  // do nothing.
+  if (isBuiltin(_name)) {
+    return;
+  }
+  // Create an end label for the function, so if we return we can jump
+  // to it without having to unwind the stack each time.
+  std::string endLabel = parser->getUnusedLabel(_name + "_end");
+  parser->addLabel(endLabel);
+  // Create a label for the function so that we can CALL it.
   parser->writeln(_name + ":");
+  // Assign registers or stack positions to parameters. Parameters can
+  // be stored in registers "A" through "D", and if there are more than
+  // 4 parameters they will be stored on the stack before the return
+  // address. The return address is stored at FP - 4, so the first
+  // overflow parameter will be stored at -6, the next at -8, etc.
+  std::string reg = "A";
+  int offset = -6;
+  for (auto param : _parameters) {
+    if (reg[0] <= 'D') {
+      param->setReg(reg);
+      reg[0]++;
+    } else {
+      param->setOffset(offset);
+      offset -= 2;
+    }
+  }
+  // Assign registers or stack positions to local variables. Local
+  // variables can be stored in registers "A" through "J", and if there
+  // are more local variables than can fit in registers we store them
+  // as frame pointer offsets. The offset starts at 0 and increases from
+  // there.
+  offset = 0;
+  for (auto local : _localVars) {
+    if (reg[0] <= 'K') {
+      local->setReg(reg);
+      // If this is a callee-saved register, push it onto the stack and
+      // make a note that we need to pop it later. Registers greater than
+      // D are callee-saved.
+      if ('D' < reg[0]) {
+        parser->writeInst("PUSH " + reg);
+        _savedRegisters.push(reg);
+      }
+      // Increment the register
+      reg[0]++;
+    } else {
+      local->setOffset(offset);
+      offset += 2;
+    }
+  }
+  // Save registers L, M, and N. These may not all need to be
+  // saved, because not all of them will be used. TODO: optimize this
+  // to only save these registers if it is necessary.
+  reg = "L";
+  while (reg[0] <= 'N') {
+    parser->writeInst("PUSH " + reg);
+    _savedRegisters.push(reg);
+    reg[0]++;
+  }
+  // Set the frame pointer to the stack's current location.
+  parser->writeInst("MOV FP SP");
+
+  // TODO: Calculate initial values of local variables, output
+  // assembly for the rest of the statement types.
+
+  // Unwind the stack, popping the saved registers, then return.
+  // We have a label here so that when we have return statements
+  // they can jump here without having to unwind the stack in
+  // multiple places.
+  parser->writeln(endLabel + ":");
+  parser->writeInst("MOV SP FP");
+  while (!_savedRegisters.empty()) {
+    parser->writeInst("POP " + _savedRegisters.top());
+    _savedRegisters.pop();
+  }
+  parser->writeInst("RET");
 }
 
 /**

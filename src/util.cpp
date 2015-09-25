@@ -61,6 +61,15 @@ bool isLabelDeclaration(const std::string& label) {
 }
 
 /**
+ * Returns true if the given funcName is a builtin function.
+ */
+bool isBuiltin(const std::string& funcName) {
+  static std::vector<std::string> builtins = { "COLOR", "PIXEL", "TIMERST",
+                                               "TIME", "INPUT" };
+  return std::find(builtins.begin(), builtins.end(), funcName) != builtins.end();
+}
+
+/**
  * Searches through a vector of parameters and returns the one that matches
  * the given name, or a null pointer if the name was not found.
  */
