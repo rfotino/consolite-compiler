@@ -1159,7 +1159,17 @@ void FunctionToken::output(Parser *parser) {
     local->output(parser);
   }
 
-  // TODO: Output assembly for the rest of the statement types.
+  // Assign assembly-level labels to all label declarations.
+  for (auto label : _labels) {
+    std::string asmLabel = parser->getUnusedLabel(_name + "_" + label->name());
+    parser->addLabel(asmLabel);
+    label->setAsmLabel(asmLabel);
+  }
+
+  // Output assembly code for the rest of the statement types.
+  for (auto statement : _statements) {
+    statement->output(parser, shared_from_this(), endLabel);
+  }
 
   // Unwind the stack, popping the saved registers, then return.
   // We have a label here so that when we have return statements
@@ -1178,6 +1188,20 @@ void FunctionToken::output(Parser *parser) {
   } else {
     parser->writeInst("RET");
   }
+}
+
+/**
+ * Translates the given source-level label within this function into the
+ * assembly-level label that has been assigned to it. Returns the empty
+ * string if the source-level label does not exist.
+ */
+std::string FunctionToken::toAsmLabel(const std::string& srcLabel) {
+  for (auto label : _labels) {
+    if (srcLabel == label->name()) {
+      return label->getAsmLabel();
+    }
+  }
+  return "";
 }
 
 /**
@@ -1283,6 +1307,21 @@ std::shared_ptr<StatementToken> StatementToken::parse(
   return nullptr;
 }
 
+/**
+ * The default implementation for a statement token's output, which
+ * is to do nothing.
+ */
+void StatementToken::output(Parser *,
+                            const std::shared_ptr<FunctionToken>&,
+                            const std::string&,
+                            const std::string&,
+                            const std::string&) {
+}
+
+/**
+ * Parses a compound statement, which consists of zero or more
+ * statements within curly braces.
+ */
 bool CompoundStatement::parse(
       Tokenizer *tokenizer,
       const std::vector<std::shared_ptr<FunctionToken>>& functions,
@@ -1318,6 +1357,16 @@ bool CompoundStatement::parse(
   // Consume the final '}' token.
   tokenizer->getNext();
   return true;
+}
+
+void CompoundStatement::output(Parser *parser,
+                               const std::shared_ptr<FunctionToken>& function,
+                               const std::string& returnLabel,
+                               const std::string& breakLabel,
+                               const std::string& continueLabel) {
+  for (auto statement : _statements) {
+    statement->output(parser, function, returnLabel, breakLabel, continueLabel);
+  }
 }
 
 bool LocalVarToken::parse(
@@ -1468,6 +1517,18 @@ bool ExprStatement::parse(
 }
 
 /**
+ * Outputs assembly code for this expression statement. This just
+ * evaluates the expression and then discards the result.
+ */
+void ExprStatement::output(Parser *parser,
+                           const std::shared_ptr<FunctionToken>&,
+                           const std::string&,
+                           const std::string&,
+                           const std::string&) {
+  _expr.output(parser, VarLocation("L"));
+}
+
+/**
  * A void statement is a function call that returns void, followed by
  * a semicolon.
  */
@@ -1493,6 +1554,17 @@ bool VoidStatement::parse(
     return false;
   }
   return true;
+}
+
+/**
+ * Outputs the assembly code for this void statement.
+ */
+void VoidStatement::output(Parser *parser,
+                           const std::shared_ptr<FunctionToken>&,
+                           const std::string&,
+                           const std::string&,
+                           const std::string&) {
+  _fnCall.output(parser);
 }
 
 /**
@@ -1550,6 +1622,23 @@ bool IfStatement::parse(
     _hasElse = false;
   }
   return true;
+}
+
+/**
+ * Outputs the assembly code for this if statement.
+ */
+void IfStatement::output(Parser *parser,
+                         const std::shared_ptr<FunctionToken>& function,
+                         const std::string& returnLabel,
+                         const std::string& breakLabel,
+                         const std::string& continueLabel) {
+  (void)parser;
+  (void)function;
+  (void)returnLabel;
+  (void)breakLabel;
+  (void)continueLabel;
+  // TODO: Implement if statement output.
+  throw "If statement to assembly conversion not yet implemented.";
 }
 
 /**
@@ -1642,6 +1731,23 @@ bool ForStatement::parse(
 }
 
 /**
+ * Outputs the assembly code for this for statement.
+ */
+void ForStatement::output(Parser *parser,
+                          const std::shared_ptr<FunctionToken>& function,
+                          const std::string& returnLabel,
+                          const std::string& breakLabel,
+                          const std::string& continueLabel) {
+  (void)parser;
+  (void)function;
+  (void)returnLabel;
+  (void)breakLabel;
+  (void)continueLabel;
+  // TODO: Implement for loop output.
+  throw "For statement to assembly conversion not yet implememented.";
+}
+
+/**
  * While statements are of the form:
  * "while (COND_EXPR) STMT"
  * where COND_EXPR is an arbitrary expression and STMT is an
@@ -1683,6 +1789,23 @@ bool WhileStatement::parse(
     return false;
   }
   return true;
+}
+
+/**
+ * Outputs the assembly code for this while statement.
+ */
+void WhileStatement::output(Parser *parser,
+                            const std::shared_ptr<FunctionToken>& function,
+                            const std::string& returnLabel,
+                            const std::string& breakLabel,
+                            const std::string& continueLabel) {
+  (void)parser;
+  (void)function;
+  (void)returnLabel;
+  (void)breakLabel;
+  (void)continueLabel;
+  // TODO: Implement while loop output.
+  throw "While statement to assembly conversion not yet implememented.";
 }
 
 /**
@@ -1738,6 +1861,23 @@ bool DoWhileStatement::parse(
 }
 
 /**
+ * Outputs the assembly code for this do-while statement.
+ */
+void DoWhileStatement::output(Parser *parser,
+                              const std::shared_ptr<FunctionToken>& function,
+                              const std::string& returnLabel,
+                              const std::string& breakLabel,
+                              const std::string& continueLabel) {
+  (void)parser;
+  (void)function;
+  (void)returnLabel;
+  (void)breakLabel;
+  (void)continueLabel;
+  // TODO: Implement do-while loop output.
+  throw "Do-while statement to assembly conversion not yet implememented.";
+}
+
+/**
  * A break statement should just be the "break" token followed
  * by a ";" token. If we are not in a loop, that is an error.
  */
@@ -1755,6 +1895,17 @@ bool BreakStatement::parse(Tokenizer *tokenizer, bool inLoop) {
 }
 
 /**
+ * Outputs this break statement.
+ */
+void BreakStatement::output(Parser *parser,
+                            const std::shared_ptr<FunctionToken>&,
+                            const std::string&,
+                            const std::string& breakLabel,
+                            const std::string&) {
+  parser->writeInst("JMPI " + breakLabel);
+}
+
+/**
  * A continue statement should just be the "continue" token followed
  * by a ";" token. If we are not in a loop, that is an error.
  */
@@ -1769,6 +1920,17 @@ bool ContinueStatement::parse(Tokenizer *tokenizer, bool inLoop) {
     return false;
   }
   return true;
+}
+
+/**
+ * Outputs this continue statement.
+ */
+void ContinueStatement::output(Parser *parser,
+                               const std::shared_ptr<FunctionToken>&,
+                               const std::string&,
+                               const std::string&,
+                               const std::string& continueLabel) {
+  parser->writeInst("JMPI " + continueLabel);
 }
 
 /**
@@ -1817,6 +1979,26 @@ bool ReturnStatement::parse(
   return true;
 }
 
+/**
+ * Calculates the return value from the return expression, if the
+ * function is not void. Then jumps to the epilogue of the function.
+ * Return values are stored in the register L.
+ */
+void ReturnStatement::output(Parser *parser,
+                             const std::shared_ptr<FunctionToken>&,
+                             const std::string& returnLabel,
+                             const std::string&,
+                             const std::string&) {
+  if (_hasExpr) {
+    _returnExpr.output(parser, VarLocation("L"));
+  }
+  parser->writeInst("JMPI " + returnLabel);
+}
+
+/**
+ * Parses a label declaration like "label:". Must start with a name and
+ * end with a colon, without whitespace.
+ */
 bool LabelStatement::parse(Tokenizer *tokenizer) {
   _lineNum = tokenizer->peekNext().line();
   // Make sure it is a valid label declaration.
@@ -1831,6 +2013,17 @@ bool LabelStatement::parse(Tokenizer *tokenizer) {
   // Name is the label declaration minus the trailing colon.
   _name = t.str().substr(0, t.str().size() - 1);
   return true;
+}
+
+/**
+ * Outputs the assembly-level label for this label statement.
+ */
+void LabelStatement::output(Parser *parser,
+                            const std::shared_ptr<FunctionToken>&,
+                            const std::string&,
+                            const std::string&,
+                            const std::string&) {
+  parser->writeln(_asmLabel + ":");
 }
 
 /**
@@ -1857,4 +2050,16 @@ bool GotoStatement::parse(Tokenizer *tokenizer) {
     return false;
   }
   return true;
+}
+
+/**
+ * Outputs the assembly code for this goto statement.
+ */
+void GotoStatement::output(Parser *parser,
+                           const std::shared_ptr<FunctionToken>& function,
+                           const std::string&,
+                           const std::string&,
+                           const std::string&) {
+  std::string asmLabel = function->toAsmLabel(_label);
+  parser->writeInst("JMPI " + asmLabel);
 }

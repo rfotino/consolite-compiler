@@ -290,6 +290,12 @@ class FunctionToken : public Token,
    * Outputs assembly code for this function.
    */
   void output(Parser *parser);
+  /**
+   * Translates the given source-level label within this function into the
+   * assembly-level label that has been assigned to it. Returns the empty
+   * string if the source-level label does not exist.
+   */
+  std::string toAsmLabel(const std::string& srcLabel);
   TypeToken type() const { return _type; }
   std::string name() const { return _name; }
   size_t numParams() const { return _parameters.size(); }
@@ -418,6 +424,15 @@ class StatementToken : public Token {
         std::vector<std::shared_ptr<GotoStatement>>& gotos,
         const std::shared_ptr<FunctionToken>& currentFunc,
         bool inLoop = false);
+  /**
+   * Outputs the assembly code for this statement. Does nothing by
+   * default, should be implemented by subclasses.
+   */
+  virtual void output(Parser *parser,
+                      const std::shared_ptr<FunctionToken>& function,
+                      const std::string& returnLabel,
+                      const std::string& breakLabel = "",
+                      const std::string& continueLabel = "");
 };
 
 /**
@@ -434,6 +449,14 @@ class CompoundStatement : public StatementToken {
              std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc,
              bool inLoop);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
  private:
   std::vector<std::shared_ptr<StatementToken>> _statements;
 };
@@ -484,6 +507,14 @@ class ExprStatement : public StatementToken {
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
  private:
   ExprToken _expr;
 };
@@ -498,6 +529,14 @@ class VoidStatement : public StatementToken {
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
  private:
   FunctionCallToken _fnCall;
 };
@@ -523,6 +562,14 @@ class IfStatement : public StatementToken {
              std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc,
              bool inLoop);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
  private:
   ExprToken _condExpr;
   std::shared_ptr<StatementToken> _trueStatement;
@@ -552,6 +599,14 @@ class ForStatement : public LoopStatement {
              std::vector<std::shared_ptr<LabelStatement>>& labels,
              std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
  private:
   std::vector<std::shared_ptr<ExprToken>> _initExprs;
   std::vector<std::shared_ptr<ExprToken>> _loopExprs;
@@ -570,6 +625,14 @@ class WhileStatement : public LoopStatement {
              std::vector<std::shared_ptr<LabelStatement>>& labels,
              std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
 };
 
 /**
@@ -585,6 +648,14 @@ class DoWhileStatement : public LoopStatement {
              std::vector<std::shared_ptr<LabelStatement>>& labels,
              std::vector<std::shared_ptr<GotoStatement>>& gotos,
              const std::shared_ptr<FunctionToken>& currentFunc);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
 };
 
 /**
@@ -594,6 +665,14 @@ class DoWhileStatement : public LoopStatement {
 class BreakStatement : public StatementToken {
  public:
   bool parse(Tokenizer *tokenizer, bool inLoop);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
 };
 
 /**
@@ -603,6 +682,14 @@ class BreakStatement : public StatementToken {
 class ContinueStatement : public StatementToken {
  public:
   bool parse(Tokenizer *tokenizer, bool inLoop);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
 };
 
 /**
@@ -617,6 +704,14 @@ class ReturnStatement : public StatementToken {
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars,
              const std::shared_ptr<FunctionToken>& currentFunc);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
  private:
   ExprToken _returnExpr;
   bool _hasExpr;
@@ -629,9 +724,30 @@ class ReturnStatement : public StatementToken {
 class LabelStatement : public StatementToken {
  public:
   bool parse(Tokenizer *tokenizer);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
+  /**
+   * Returns the source-level label.
+   */
   std::string name() const { return _name; }
+  /**
+   * Sets the assembly-level label used for jumping to this
+   * label statement.
+   */
+  void setAsmLabel(const std::string& label) { _asmLabel = label; }
+  /**
+   * Returns the assembly-level label.
+   */
+  std::string getAsmLabel() const { return _asmLabel; }
  private:
   std::string _name;
+  std::string _asmLabel;
 };
 
 /**
@@ -641,6 +757,17 @@ class LabelStatement : public StatementToken {
 class GotoStatement : public StatementToken {
  public:
   bool parse(Tokenizer *tokenizer);
+  /**
+   * Outputs the assembly code for this statement.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<FunctionToken>& function,
+              const std::string& returnLabel,
+              const std::string& breakLabel,
+              const std::string& continueLabel);
+  /**
+   * Returns the source-level label.
+   */
   std::string label() const { return _label; }
  private:
   std::string _label;
