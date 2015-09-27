@@ -7,12 +7,13 @@
 #include "util.h"
 
 /**
- * Returns a 4-digit hex string of the form "0x0000"
- * from the given unsigned 16-bit value.
+ * Returns a hex string of the form "0x0000" for the
+ * given value, where digits is the number of digits after
+ * the "0x".
  */
-std::string toHexStr(uint16_t value) {
+std::string toHexStr(uint16_t value, int digits) {
   std::string str;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < digits; i++) {
     uint8_t next = value & 0xf;
     value >>= 4;
     str = (char)(next <= 9 ? '0' + next : 'a' - 10 + next) + str;

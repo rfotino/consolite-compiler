@@ -188,6 +188,19 @@ uint16_t OperatorToken::operate(uint16_t lhs, uint16_t rhs) const {
 }
 
 /**
+ * Outputs assembly code for this operation on the given left hand and
+ * right hand sides.
+ */
+void OperatorToken::output(Parser *parser,
+                           const std::shared_ptr<Token>& lhs,
+                           const std::shared_ptr<Token>& rhs) {
+  // TODO: Output assembly code for the operation.
+  if (lhs && rhs) {
+    parser = parser;
+  }
+}
+
+/**
  * Parses either a single type or an array type, like "uint16"
  * or "uint16[32]". The expression within square brackets must
  * be known at compile time.
@@ -390,6 +403,9 @@ bool ExprToken::parse(
   }
   // Evaluate the expression, if it is known at compile-time.
   _evaluate();
+  // Flag variables that are not able to be stored in registers due to
+  // address-of operations.
+  _flagNonRegs();
   return true;
 }
 
@@ -406,7 +422,7 @@ bool ExprToken::_validate() {
     } else if (typeid(*token) == typeid(GlobalVarToken) ||
                typeid(*token) == typeid(ParamToken) ||
                typeid(*token) == typeid(LocalVarToken)) {
-      operands.push("lvalue");
+      operands.push("vvalue");
     } else if (typeid(*token) == typeid(OperatorToken)) {
       auto op = std::dynamic_pointer_cast<OperatorToken>(token);
       std::string rhs = operands.top();
@@ -418,7 +434,7 @@ bool ExprToken::_validate() {
       }
       std::string result;
       if ("=" == op->str()) {
-        if ("lvalue" != lhs) {
+        if ("rvalue" == lhs) {
           _error("Can't assign to an rvalue in expression.", op->line());
           return false;
         }
@@ -426,8 +442,9 @@ bool ExprToken::_validate() {
       } else if ("*" == op->str() && op->isUnary()) {
         result = "lvalue";
       } else if ("&" == op->str() && op->isUnary()) {
-        if ("lvalue" != rhs) {
-          _error("Can't get address of an rvalue in expression.", op->line());
+        if ("vvalue" != rhs) {
+          _error("Can't get address of a non-variable in expression.",
+                 op->line());
           return false;
         }
         result = "rvalue";
@@ -505,6 +522,123 @@ void ExprToken::_evaluate() {
     }
   }
   _value = operands.top()->val();
+}
+
+/**
+ * Flags variables used in this expression that are not able to be stored
+ * in registers due to address-of operations.
+ */
+void ExprToken::_flagNonRegs() {
+  std::stack<std::shared_ptr<Token>> operands;
+  for (auto token : _postfix) {
+    auto op = std::dynamic_pointer_cast<OperatorToken>(token);
+    if (nullptr != op) {
+      std::shared_ptr<Token> rhs = operands.top();
+      operands.pop();
+      if (op->isBinary()) {
+        operands.pop();
+      }
+      // Check if it is an address-of operation
+      if (op->isUnary() && "&" == op->str()) {
+        auto var = std::dynamic_pointer_cast<Variable>(rhs);
+        if (nullptr != var) {
+          var->flagNonReg();
+        }
+      }
+      // Push something back onto the stack.
+      operands.push(nullptr);
+    } else {
+      operands.push(token);
+    }
+  }
+}
+
+/**
+ * Outputs assembly code to evaluate the given expression and store the
+ * result in the given register, reg.
+ */
+void ExprToken::output(Parser *parser, const VarLocation& varLoc) {
+  // Evaluate the postfix expression using the stack, pushing nullptr
+  // as an operand where a temporary value would go (one that is
+  // not already represented by a Token).
+  std::stack<std::shared_ptr<Token>> operands;
+  for (auto token : _postfix) {
+    auto op = std::dynamic_pointer_cast<OperatorToken>(token);
+    auto var = std::dynamic_pointer_cast<Variable>(token);
+    auto literal = std::dynamic_pointer_cast<LiteralToken>(token);
+    auto fnCall = std::dynamic_pointer_cast<FunctionCallToken>(token);
+    if (nullptr != op) {
+      // Pop one or two operands off the stack, depending on if the
+      // operator is unary or binary. Then output the operation in
+      // assembly.
+      std::shared_ptr<Token> rhs = operands.top();
+      operands.pop();
+      std::shared_ptr<Token> lhs;
+      if (op->isBinary()) {
+        lhs = operands.top();
+        operands.pop();
+      }
+      op->output(parser, lhs, rhs);
+      operands.push(nullptr);
+    } else if (nullptr != var) {
+      // Save this token because we might actually need the address
+      // instead of the value.
+      operands.push(token);
+      // Push the value of this variable onto the stack for now.
+      if (var->isReg()) {
+        parser->writeInst("PUSH " + var->getReg());
+      } else {
+        // Get the variable's location into register M
+        parser->writeInst("MOV M FP");
+        int offset = var->getOffset();
+        if (0 != offset) {
+          parser->writeInst("MOVI L " + toHexStr(0 < offset ? offset : -offset));
+          if (0 < offset) {
+            parser->writeInst("ADD M L");
+          } else {
+            parser->writeInst("SUB M L");
+          }
+        }
+        // Load the value pointed to by M into M and push it onto the stack.
+        parser->writeInst("LOAD M M");
+        parser->writeInst("PUSH M");
+      }
+    } else if (nullptr != literal) {
+      // Push the value of this literal onto the stack.
+      parser->writeInst("MOVI L " + toHexStr(literal->val()));
+      parser->writeInst("PUSH L");
+      // Don't save this token because we won't need it later, just save
+      // a placeholder.
+      operands.push(nullptr);
+    } else if (nullptr != fnCall) {
+      // TODO: Get the result of the function call and push it onto the stack.
+      throw "Function call to assembly conversion not yet supported.";
+      // Don't save this token because we won't need it later, just save
+      // a placeholder.
+      operands.push(nullptr);
+    }
+  }
+  // Move the evaluated expression output to the given variable location.
+  if (varLoc.isReg()) {
+    parser->writeInst("POP " + varLoc.getReg());
+  } else {
+    // Get the variable's address in a register so that we can store to
+    // that address.
+    int offset = varLoc.getOffset();
+    parser->writeInst("MOV M FP");
+    if (0 != offset) {
+      parser->writeInst("MOVI L " + toHexStr(0 < offset ? offset : -offset));
+      if (0 < offset) {
+        parser->writeInst("ADD M L");
+      } else {
+        parser->writeInst("SUB M L");
+      }
+    }
+    // Pop the result from the expression and store it in the calculated
+    // address.
+    parser->writeInst("POP L");
+    parser->writeInst("STOR L M");
+  }
 }
 
 /**
@@ -902,24 +1036,27 @@ void FunctionToken::output(Parser *parser) {
   // address. The return address is stored at FP - 4, so the first
   // overflow parameter will be stored at -6, the next at -8, etc.
   std::string reg = "A";
-  int offset = -6;
+  int offset = -(INST_SIZE + DATA_SIZE);
+  int numOverflowParams = 0;
   for (auto param : _parameters) {
     if (reg[0] <= 'D') {
       param->setReg(reg);
       reg[0]++;
     } else {
       param->setOffset(offset);
-      offset -= 2;
+      offset -= DATA_SIZE;
+      numOverflowParams++;
     }
   }
   // Assign registers or stack positions to local variables. Local
-  // variables can be stored in registers "A" through "J", and if there
+  // variables can be stored in registers "E" through "J", and if there
   // are more local variables than can fit in registers we store them
   // as frame pointer offsets. The offset starts at 0 and increases from
   // there.
+  reg = "E";
   offset = 0;
   for (auto local : _localVars) {
-    if (reg[0] <= 'K') {
+    if (reg[0] <= 'K' && local->canBeReg()) {
       local->setReg(reg);
       // If this is a callee-saved register, push it onto the stack and
       // make a note that we need to pop it later. Registers greater than
@@ -932,23 +1069,37 @@ void FunctionToken::output(Parser *parser) {
       reg[0]++;
     } else {
       local->setOffset(offset);
-      offset += 2;
+      offset += DATA_SIZE;
     }
-  }
-  // Save registers L, M, and N. These may not all need to be
-  // saved, because not all of them will be used. TODO: optimize this
-  // to only save these registers if it is necessary.
-  reg = "L";
-  while (reg[0] <= 'N') {
-    parser->writeInst("PUSH " + reg);
-    _savedRegisters.push(reg);
-    reg[0]++;
+    // If this is an array, reserve space for the array's data.
+    if (local->type().isArray()) {
+      local->setDataOffset(offset);
+      offset += local->type().arraySize() * DATA_SIZE;
+    }
   }
   // Set the frame pointer to the stack's current location.
   parser->writeInst("MOV FP SP");
+  // Store parameters on the stack if they are currently stored in
+  // registers but are flagged as needing their own address.
+  for (auto param : _parameters) {
+    if (param->isReg() && !param->canBeReg()) {
+      parser->writeInst("PUSH " + param->getReg());
+      param->setOffset(offset);
+      offset += DATA_SIZE;
+    }
+  }
+  // Reserve space for the local variable storage on the stack.
+  if (0 < offset) {
+    parser->writeInst("MOVI L " + toHexStr(offset));
+    parser->writeInst("ADD SP L");
+  }
 
-  // TODO: Calculate initial values of local variables, output
-  // assembly for the rest of the statement types.
+  // Outputs initial values of local variables.
+  for (auto local : _localVars) {
+    local->output(parser);
+  }
+
+  // TODO: Output assembly for the rest of the statement types.
 
   // Unwind the stack, popping the saved registers, then return.
   // We have a label here so that when we have return statements
@@ -960,7 +1111,13 @@ void FunctionToken::output(Parser *parser) {
     parser->writeInst("POP " + _savedRegisters.top());
     _savedRegisters.pop();
   }
-  parser->writeInst("RET");
+  // If there are overflow parameters, pop them off the stack in
+  // addition to jumping to the return address.
+  if (0 < numOverflowParams) {
+    parser->writeInst("RET " + toHexStr(numOverflowParams * DATA_SIZE, 2));
+  } else {
+    parser->writeInst("RET");
+  }
 }
 
 /**
@@ -1184,6 +1341,48 @@ bool LocalVarToken::parse(
     return false;
   }
   return true;
+}
+
+/**
+ * If an initial value is set for this local variable, this outputs the
+ * assembly code to initialize the variable.
+ */
+void LocalVarToken::output(Parser *parser) {
+  if (_type.isArray()) {
+    // Store the location of the array at the variable's location.
+    if (this->isReg()) {
+      // Store FP + _dataOffset in the variable's register.
+      parser->writeInst("MOV " + this->getReg() + " FP");
+      if (0 != _dataOffset) {
+        parser->writeInst("MOVI L " + toHexStr(_dataOffset));
+        parser->writeInst("ADD " + this->getReg() + "L");
+      }
+    } else {
+      // Store FP + _offset in M
+      parser->writeInst("MOV M FP");
+      if (0 != _offset) {
+        parser->writeInst("MOVI L " + toHexStr(_offset));
+        parser->writeInst("ADD M L");
+      }
+      // Store FP + _dataOffset in N
+      parser->writeInst("MOV N FP");
+      if (0 != _dataOffset) {
+        parser->writeInst("MOVI L " + toHexStr(_dataOffset));
+        parser->writeInst("ADD N L");
+      }
+      // Store the data offset in the variable's location relative to
+      // the frame pointer.
+      parser->writeInst("STOR N M");
+    }
+    for (size_t i = 0; i < _initExprs.size(); i++) {
+      // Output initial expressions for each element.
+      _initExprs[i]->output(parser, VarLocation(_dataOffset + (DATA_SIZE * i)));
+    }
+  } else {
+    // Output initial expression for the scalar, to either the register
+    // or frame pointer offset.
+    _initExprs[0]->output(parser, VarLocation(_reg, _offset));
+  }
 }
 
 /**

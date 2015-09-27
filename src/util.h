@@ -15,10 +15,11 @@
 #define INST_SIZE    4
 
 /**
- * Returns a 4-digit hex string of the form "0x0000"
- * from the given unsigned 16-bit value.
+ * Returns a hex string of the form "0x0000" for the
+ * given value, where digits is the number of digits after
+ * the "0x".
  */
-std::string toHexStr(uint16_t value);
+std::string toHexStr(uint16_t value, int digits = 4);
 
 /**
  * Returns the opposing paranthesis for (), [], or {} pairs.

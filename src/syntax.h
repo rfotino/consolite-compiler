@@ -116,6 +116,13 @@ class OperatorToken : public Token {
    */
   uint16_t operate(uint16_t lhs, uint16_t rhs) const;
   /**
+   * Outputs assembly code for this operation on the given left hand and
+   * right hand sides.
+   */
+  void output(Parser *parser,
+              const std::shared_ptr<Token>& lhs,
+              const std::shared_ptr<Token>& rhs);
+  /**
    * Returns a string representation of the operator.
    */
   std::string str() const { return _op; }
@@ -148,21 +155,17 @@ class TypeToken : public Token {
   uint16_t _arraySize;
 };
 
-/**
- * A class for storing information about a variable, such as the type,
- * name, and location as a register or frame offset.
- */
-class Variable {
+class VarLocation {
  public:
-  Variable() { }
-  Variable(const TypeToken& type, const std::string& name)
-    : _type(type), _name(name) { }
-  TypeToken type() const { return _type; }
-  std::string name() const { return _name; }
+  VarLocation() { }
+  VarLocation(const std::string& reg) : _reg(reg) { }
+  VarLocation(int offset) : _offset(offset) { }
+  VarLocation(const std::string& reg, int offset)
+    : _reg(reg), _offset(offset) { }
   /**
    * Returns true if the variable's location is stored in a register.
    */
-  bool isReg() const { return _reg.empty(); }
+  bool isReg() const { return !_reg.empty(); }
   /**
    * Returns the assembly code representation of this register, like "A".
    */
@@ -182,8 +185,6 @@ class Variable {
    */
   void setOffset(int offset) { _offset = offset; }
  protected:
-  TypeToken _type;
-  std::string _name;
   /**
    * The assembly code representation of this register, or the empty
    * string if it is not stored in a register.
@@ -194,6 +195,32 @@ class Variable {
    * is stored, if it is not in a register.
    */
   int _offset;
+};
+
+/**
+ * A class for storing information about a variable, such as the type,
+ * name, and location as a register or frame offset.
+ */
+class Variable : public VarLocation {
+ public:
+  Variable() : _canBeReg(true) { }
+  Variable(const TypeToken& type, const std::string& name)
+    : _type(type), _name(name), _canBeReg(true) { }
+  TypeToken type() const { return _type; }
+  std::string name() const { return _name; }
+  /**
+   * Returns true if this variable can be stored in a register.
+   */
+  bool canBeReg() const { return _canBeReg; }
+  /**
+   * Flags this variable as not able to be stored in a register. This
+   * could be because it was used with an address operator.
+   */
+  void flagNonReg() { _canBeReg = false; }
+ protected:
+  TypeToken _type;
+  std::string _name;
+  bool _canBeReg;
 };
 
 /**
@@ -294,6 +321,11 @@ class ExprToken : public Token {
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars = {});
   bool isConst() const { return _const; }
   uint16_t val() const { return _value; }
+  /**
+   * Outputs assembly code to evaluate the given expression and store the
+   * result in the given register, reg.
+   */
+  void output(Parser *parser, const VarLocation& varLoc);
  private:
   /**
    * Validates the expression to see if it will compile. Prints errors if
@@ -307,6 +339,11 @@ class ExprToken : public Token {
    * etc.
    */
   void _evaluate();
+  /**
+   * Flags variables used in this expression that are not able to be stored
+   * in registers due to address-of operations.
+   */
+  void _flagNonRegs();
   /**
    * Whether this expression is constant (meaning, in this context, known
    * at compile-time).
@@ -407,6 +444,16 @@ class LocalVarToken : public StatementToken, public Variable {
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+  /**
+   * If an initial value is set for this local variable, this outputs the
+   * assembly code to initialize the variable.
+   */
+  void output(Parser *parser);
+  /**
+   * Sets the location of the start of data as an offset from the frame pointer,
+   * used for array variables.
+   */
+  void setDataOffset(uint16_t dataOffset) { _dataOffset = dataOffset; }
  private:
   /**
    * The initialization expressions. This will be an empty vector
@@ -414,6 +461,11 @@ class LocalVarToken : public StatementToken, public Variable {
    * not an array, or one or more values if _type is an array.
    */
   std::vector<std::shared_ptr<ExprToken>> _initExprs;
+  /**
+   * The location of the start of data as an offset from the frame pointer,
+   * used for array variablefs.
+   */
+  uint16_t _dataOffset;
 };
 
 /**
