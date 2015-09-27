@@ -284,7 +284,7 @@ bool ExprToken::parse(
       }
       // Pop operators off the stack until we reach a corresponding "("
       while (!opStack.empty() &&
-             typeid(*opStack.top()) == typeid(OperatorToken)) {
+             std::dynamic_pointer_cast<OperatorToken>(opStack.top())) {
         _postfix.push_back(opStack.top());
         opStack.pop();
       }
@@ -310,9 +310,9 @@ bool ExprToken::parse(
         return false;
       }
       // Handle the operator stack based on precedence.
+      std::shared_ptr<OperatorToken> topOp;
       while (!opStack.empty() &&
-             typeid(*opStack.top()) == typeid(OperatorToken)) {
-        auto topOp = std::dynamic_pointer_cast<OperatorToken>(opStack.top());
+             (topOp = std::dynamic_pointer_cast<OperatorToken>(opStack.top()))) {
         if (op->precedence() < topOp->precedence()) {
           break;
         } else if (op->precedence() == topOp->precedence()) {
@@ -416,15 +416,15 @@ bool ExprToken::parse(
 bool ExprToken::_validate() {
   std::stack<std::string> operands;
   for (auto token : _postfix) {
-    if (typeid(*token) == typeid(LiteralToken) ||
-        typeid(*token) == typeid(FunctionCallToken)) {
+    std::shared_ptr<OperatorToken> op;
+    if (std::dynamic_pointer_cast<LiteralToken>(token) ||
+        std::dynamic_pointer_cast<FunctionCallToken>(token)) {
       operands.push("rvalue");
-    } else if (typeid(*token) == typeid(GlobalVarToken) ||
-               typeid(*token) == typeid(ParamToken) ||
-               typeid(*token) == typeid(LocalVarToken)) {
+    } else if (std::dynamic_pointer_cast<GlobalVarToken>(token) ||
+               std::dynamic_pointer_cast<ParamToken>(token) ||
+               std::dynamic_pointer_cast<LocalVarToken>(token)) {
       operands.push("vvalue");
-    } else if (typeid(*token) == typeid(OperatorToken)) {
-      auto op = std::dynamic_pointer_cast<OperatorToken>(token);
+    } else if (op = std::dynamic_pointer_cast<OperatorToken>(token)) {
       std::string rhs = operands.top();
       operands.pop();
       std::string lhs;
@@ -468,19 +468,19 @@ void ExprToken::_evaluate() {
   // Evaluate the postfix expression
   std::stack<std::shared_ptr<Token>> operands;
   for (auto token : _postfix) {
-    if (typeid(*token) == typeid(LiteralToken) ||
-        typeid(*token) == typeid(GlobalVarToken)) {
+    std::shared_ptr<OperatorToken> op;
+    if (std::dynamic_pointer_cast<LiteralToken>(token) ||
+        std::dynamic_pointer_cast<GlobalVarToken>(token)) {
       operands.push(token);
-    } else if (typeid(*token) == typeid(ParamToken) ||
-               typeid(*token) == typeid(LocalVarToken) ||
-               typeid(*token) == typeid(FunctionCallToken)) {
+    } else if (std::dynamic_pointer_cast<ParamToken>(token) ||
+               std::dynamic_pointer_cast<LocalVarToken>(token) ||
+               std::dynamic_pointer_cast<FunctionCallToken>(token)) {
       // We don't know parameter or local variable values at
       // compile time, nor do we know the output of functions,
       // so this expression can't be constant.
       _const = false;
       return;
-    } else if (typeid(*token) == typeid(OperatorToken)) {
-      auto op = std::dynamic_pointer_cast<OperatorToken>(token);
+    } else if (op = std::dynamic_pointer_cast<OperatorToken>(token)) {
       std::shared_ptr<Token> rhs = operands.top();
       operands.pop();
       std::shared_ptr<Token> lhs;
@@ -498,11 +498,11 @@ void ExprToken::_evaluate() {
         _const = false;
         return;
       } else if ("[" == op->str() && op->isBinary()) {
-        if (typeid(*lhs) != typeid(GlobalVarToken)) {
+        auto global = std::dynamic_pointer_cast<GlobalVarToken>(lhs);
+        if (nullptr == global) {
           _const = false;
           return;
         }
-        auto global = std::dynamic_pointer_cast<GlobalVarToken>(lhs);
         if (!global->isArray()) {
           _const = false;
           return;
@@ -981,7 +981,7 @@ bool FunctionToken::parse(
     }
     // If it's a local variable declaration, add it to the list of local
     // variables.
-    if (typeid(*statement) == typeid(LocalVarToken)) {
+    if (std::dynamic_pointer_cast<LocalVarToken>(statement)) {
       if (!inDeclarations) {
         _error("Declarations must come before other "
                "statements in function '" + _name + "()'.",
@@ -1248,7 +1248,7 @@ bool CompoundStatement::parse(
     }
     // Local variables are only allowed as top level statements in
     // a function.
-    if (typeid(*statement) == typeid(LocalVarToken)) {
+    if (std::dynamic_pointer_cast<LocalVarToken>(statement)) {
       _error("Local variables can only be declared as top level "
              "statements in a function.", statement->line());
       return false;
