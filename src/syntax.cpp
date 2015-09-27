@@ -1741,20 +1741,50 @@ bool ForStatement::parse(
 }
 
 /**
- * Outputs the assembly code for this for statement.
+ * Outputs the assembly code for this for statement. The output looks like
+ * the following:
+ *
+ * [initial-expressions]
+ * start_label:
+ * if (![condition])
+ *   goto break_label;
+ * [body-statements]
+ * continue_label:
+ * [loop-expressions]
+ * goto start_label;
+ * break_label:
  */
 void ForStatement::output(Parser *parser,
                           const std::shared_ptr<FunctionToken>& function,
                           const std::string& returnLabel,
-                          const std::string& breakLabel,
-                          const std::string& continueLabel) {
-  (void)parser;
-  (void)function;
-  (void)returnLabel;
-  (void)breakLabel;
-  (void)continueLabel;
-  // TODO: Implement for loop output.
-  throw "For statement to assembly conversion not yet implememented.";
+                          const std::string&,
+                          const std::string&) {
+  // Evaluate the initial expressions and discard the result.
+  for (auto expr : _initExprs) {
+    expr->output(parser, VarLocation("L"));
+  }
+  // Create the start, break, and continue labels.
+  std::string startLabel =
+    parser->getUnusedLabel(function->name() + "_for_start");
+  std::string breakLabel =
+    parser->getUnusedLabel(function->name() + "_for_break");
+  std::string continueLabel =
+    parser->getUnusedLabel(function->name() + "_for_continue");
+  // Output the start label and test the condition.
+  parser->writeln(startLabel + ":");
+  _condExpr->output(parser, VarLocation("L"));
+  parser->writeInst("TST L L");
+  parser->writeInst("JEQ " + breakLabel);
+  // Output the function body followed by the continue label.
+  _body->output(parser, function, returnLabel, breakLabel, continueLabel);
+  parser->writeln(continueLabel + ":");
+  // Output the loop expressions and jump to the start of the loop.
+  for (auto expr : _loopExprs) {
+    expr->output(parser, VarLocation("L"));
+  }
+  parser->writeInst("JMPI " + startLabel);
+  // Output the break label.
+  parser->writeln(breakLabel + ":");
 }
 
 /**
@@ -1802,20 +1832,36 @@ bool WhileStatement::parse(
 }
 
 /**
- * Outputs the assembly code for this while statement.
+ * Outputs the assembly code for this while statement. This should be of
+ * the following form:
+ *
+ * continue_label:
+ * if (![condition])
+ *   goto break_label;
+ * [body-statements]
+ * goto continue_label;
+ * break_label:
  */
 void WhileStatement::output(Parser *parser,
                             const std::shared_ptr<FunctionToken>& function,
                             const std::string& returnLabel,
-                            const std::string& breakLabel,
-                            const std::string& continueLabel) {
-  (void)parser;
-  (void)function;
-  (void)returnLabel;
-  (void)breakLabel;
-  (void)continueLabel;
-  // TODO: Implement while loop output.
-  throw "While statement to assembly conversion not yet implememented.";
+                            const std::string&,
+                            const std::string&) {
+  // Create the break and continue labels.
+  std::string breakLabel =
+    parser->getUnusedLabel(function->name() + "_while_break");
+  std::string continueLabel =
+    parser->getUnusedLabel(function->name() + "_while_continue");
+  // Output the continue label and test the condition.
+  parser->writeln(continueLabel + ":");
+  _condExpr->output(parser, VarLocation("L"));
+  parser->writeInst("TST L L");
+  parser->writeInst("JEQ " + breakLabel);
+  // Output the loop body and then jump to the start again.
+  _body->output(parser, function, returnLabel, breakLabel, continueLabel);
+  parser->writeInst("JMPI " + continueLabel);
+  // Output the break label.
+  parser->writeln(breakLabel + ":");
 }
 
 /**
@@ -1871,20 +1917,35 @@ bool DoWhileStatement::parse(
 }
 
 /**
- * Outputs the assembly code for this do-while statement.
+ * Outputs the assembly code for this do-while statement. This should be
+ * of the form:
+ *
+ * continue_label:
+ * [body-statments]
+ * if ([condition])
+ *   goto continue_label;
+ * break_label:
  */
 void DoWhileStatement::output(Parser *parser,
                               const std::shared_ptr<FunctionToken>& function,
                               const std::string& returnLabel,
-                              const std::string& breakLabel,
-                              const std::string& continueLabel) {
-  (void)parser;
-  (void)function;
-  (void)returnLabel;
-  (void)breakLabel;
-  (void)continueLabel;
-  // TODO: Implement do-while loop output.
-  throw "Do-while statement to assembly conversion not yet implememented.";
+                              const std::string&,
+                              const std::string&) {
+  // Create the break and continue labels.
+  std::string breakLabel =
+    parser->getUnusedLabel(function->name() + "_do_while_break");
+  std::string continueLabel =
+    parser->getUnusedLabel(function->name() + "_do_while_continue");
+  // Output the continue label.
+  parser->writeln(continueLabel + ":");
+  // Output the loop body.
+  _body->output(parser, function, returnLabel, breakLabel, continueLabel);
+  // Test the condition.
+  _condExpr->output(parser, VarLocation("L"));
+  parser->writeInst("TST L L");
+  parser->writeInst("JNE " + continueLabel);
+  // Output the break label.
+  parser->writeln(breakLabel + ":");
 }
 
 /**
