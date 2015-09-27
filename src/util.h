@@ -9,11 +9,19 @@
 #include <iostream>
 #include "tokenizer.h"
 #include "syntax.h"
+#include "parser.h"
 
 #define ADDRESS_SIZE 2
 #define DATA_SIZE    2
 #define INST_SIZE    4
 
+/**
+ * Puts this operand's value in the given register. Only requires
+ * the use of the one register.
+ */
+void operandValueToReg(Parser *parser,
+                       const Operand& operand,
+                       const std::string& reg);
 /**
  * Returns a hex string of the form "0x0000" for the
  * given value, where digits is the number of digits after

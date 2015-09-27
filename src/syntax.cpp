@@ -189,52 +189,43 @@ uint16_t OperatorToken::operate(uint16_t lhs, uint16_t rhs) const {
 
 /**
  * Outputs assembly code for this operation on the given left hand and
- * right hand sides.
+ * right hand sides. Returns an operand representing the result, which
+ * will be an address or a value depending on the operation.
  */
-void OperatorToken::output(Parser *parser,
-                           const std::shared_ptr<Token>& lhs,
-                           const std::shared_ptr<Token>& rhs) {
+Operand OperatorToken::output(Parser *parser,
+                              const Operand& lhs, const Operand& rhs) {
   if (isUnary()) {
     if ("-" == _op) {
       // The negative of a 2's complement number x is ~x + 1.
-      parser->writeInst("POP M");
+      operandValueToReg(parser, rhs, "M");
       parser->writeInst("MOVI N 0xffff");
       parser->writeInst("XOR M N");
       parser->writeInst("MOVI N 0x1");
       parser->writeInst("ADD M N");
       parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     } else if ("*" == _op) {
-      // Dereference operator.
-      parser->writeInst("POP M");
-      parser->writeInst("LOAD M M");
-      parser->writeInst("PUSH M");
+      // Dereference operator. Do nothing because the address of the operand
+      // is already on the stack.
+      return Operand(OperandType::ADDRESS);
     } else if ("&" == _op) {
-      // Pop the value of the variable, discard it, and push the address
-      // of the variable.
-      parser->writeInst("POP L");
-      parser->writeInst("MOV M FP");
-      int offset = std::dynamic_pointer_cast<Variable>(rhs)->getOffset();
-      if (0 != offset) {
-        if (offset < 0) {
-          parser->writeInst("MOVI L " + toHexStr(-offset));
-          parser->writeInst("SUB M L");
-        } else {
-          parser->writeInst("MOVI L " + toHexStr(offset));
-          parser->writeInst("ADD M L");
-        }
+      // Do nothing, the value should already be on the stack.
+      if (OperandType::ADDRESS != rhs.type()) {
+        throw "Right hand side must be an address for the address-of operator.";
       }
-      parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     } else if ("~" == _op) {
       // x ^ 0xffff == ~x
-      parser->writeInst("POP M");
+      operandValueToReg(parser, rhs, "M");
       parser->writeInst("MOVI N 0xffff");
       parser->writeInst("XOR M N");
       parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     } else if ("!" == _op) {
       // x = x != 0 ? 1 : 0
       std::string label1 = parser->getUnusedLabel("label");
       std::string label2 = parser->getUnusedLabel("label");
-      parser->writeInst("POP M");
+      operandValueToReg(parser, rhs, "M");
       parser->writeInst("TST M M");
       parser->writeInst("JNE " + label1);
       parser->writeInst("MOVI M 0x1");
@@ -243,27 +234,42 @@ void OperatorToken::output(Parser *parser,
       parser->writeInst("MOVI M 0x0");
       parser->writeln(label2 + ":");
       parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     } else if ("+" == _op) {
-      // Do nothing.
+      // Get the value and push it onto the stack.
+      operandValueToReg(parser, rhs, "M");
+      parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     }
   } else if (isBinary()) {
     if ("%" == _op) {
       // a % b == a - (b * (a / b))
-      parser->writeInst("POP N");
-      parser->writeInst("POP M");
+      operandValueToReg(parser, rhs, "N");
+      operandValueToReg(parser, lhs, "M");
       parser->writeInst("MOV L M");
       parser->writeInst("DIV M N");
       parser->writeInst("MUL M N");
       parser->writeInst("SUB L M");
       parser->writeInst("PUSH L");
+      return Operand(OperandType::VALUE);
     } else if ("=" == _op) {
-      (void)lhs;
-      throw "Output of binary assignment not yet supported.";
+      // Load RHS value into a register.
+      operandValueToReg(parser, rhs, "N");
+      if (OperandType::ADDRESS == lhs.type()) {
+        parser->writeInst("POP M");
+        parser->writeInst("STOR M N");
+      } else if (OperandType::REGISTER == lhs.type()) {
+        parser->writeInst("MOV " + lhs.reg() + " N");
+      } else if (OperandType::VALUE == lhs.type()) {
+        throw "Left hand side of assignment cannot be an rvalue.";
+      }
+      parser->writeInst("PUSH N");
+      return Operand(OperandType::VALUE);
     } else if ("+" == _op || "-" == _op || "*" == _op || "/" == _op ||
                "&" == _op || "|" == _op || "^" == _op ||
                "<<" == _op || ">>" == _op) {
-      parser->writeInst("POP N");
-      parser->writeInst("POP M");
+      operandValueToReg(parser, rhs, "N");
+      operandValueToReg(parser, lhs, "M");
       std::string inst;
       if ("+" == _op) {
         inst = "ADD";
@@ -286,13 +292,21 @@ void OperatorToken::output(Parser *parser,
       }
       parser->writeInst(inst + " M N");
       parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     } else if ("[" == _op) {
-      throw "Output of array indexing not yet supported.";
+      // For x[a], push &x + (a * DATA_SIZE) onto the stack.
+      operandValueToReg(parser, lhs, "M");
+      operandValueToReg(parser, rhs, "N");
+      parser->writeInst("MOVI L " + toHexStr(DATA_SIZE));
+      parser->writeInst("MUL N L");
+      parser->writeInst("ADD M N");
+      parser->writeInst("PUSH M");
+      return Operand(OperandType::ADDRESS);
     } else if ("||" == _op || "&&" == _op) {
       // Make N either 0 or 1.
       std::string label1 = parser->getUnusedLabel("label");
       std::string label2 = parser->getUnusedLabel("label");
-      parser->writeInst("POP N");
+      operandValueToReg(parser, rhs, "N");
       parser->writeInst("TST N N");
       parser->writeInst("JEQ " + label1);
       parser->writeInst("MOVI N 0x1");
@@ -303,7 +317,7 @@ void OperatorToken::output(Parser *parser,
       // Make M either 0 or 1.
       std::string label3 = parser->getUnusedLabel("label");
       std::string label4 = parser->getUnusedLabel("label");
-      parser->writeInst("POP M");
+      operandValueToReg(parser, lhs, "M");
       parser->writeInst("TST M M");
       parser->writeInst("JEQ " + label3);
       parser->writeInst("MOVI M 0x1");
@@ -319,12 +333,13 @@ void OperatorToken::output(Parser *parser,
       }
       // Push the result.
       parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     } else if ("<" == _op || "<=" == _op || ">" == _op || ">=" == _op ||
                "==" == _op || "!=" == _op) {
       std::string label1 = parser->getUnusedLabel("label");
       std::string label2 = parser->getUnusedLabel("label");
-      parser->writeInst("POP N");
-      parser->writeInst("POP M");
+      operandValueToReg(parser, rhs, "N");
+      operandValueToReg(parser, lhs, "M");
       parser->writeInst("CMP M N");
       std::string inst;
       if ("<" == _op) {
@@ -347,8 +362,11 @@ void OperatorToken::output(Parser *parser,
       parser->writeInst("MOVI M 0x1");
       parser->writeln(label2 + ":");
       parser->writeInst("PUSH M");
+      return Operand(OperandType::VALUE);
     }
   }
+  // By default return a value type, control should never reach here.
+  return Operand(OperandType::VALUE);
 }
 
 /**
@@ -574,7 +592,7 @@ bool ExprToken::_validate() {
     } else if (std::dynamic_pointer_cast<GlobalVarToken>(token) ||
                std::dynamic_pointer_cast<ParamToken>(token) ||
                std::dynamic_pointer_cast<LocalVarToken>(token)) {
-      operands.push("vvalue");
+      operands.push("lvalue");
     } else if (op = std::dynamic_pointer_cast<OperatorToken>(token)) {
       std::string rhs = operands.top();
       operands.pop();
@@ -593,8 +611,8 @@ bool ExprToken::_validate() {
       } else if ("*" == op->str() && op->isUnary()) {
         result = "lvalue";
       } else if ("&" == op->str() && op->isUnary()) {
-        if ("vvalue" != rhs) {
-          _error("Can't get address of a non-variable in expression.",
+        if ("lvalue" != rhs) {
+          _error("Can't get address of an rvalue in expression.",
                  op->line());
           return false;
         }
@@ -712,9 +730,10 @@ void ExprToken::output(Parser *parser, const VarLocation& varLoc) {
   // Evaluate the postfix expression using the stack, pushing nullptr
   // as an operand where a temporary value would go (one that is
   // not already represented by a Token).
-  std::stack<std::shared_ptr<Token>> operands;
+  std::stack<Operand> operands;
   for (auto token : _postfix) {
     auto op = std::dynamic_pointer_cast<OperatorToken>(token);
+    auto global = std::dynamic_pointer_cast<GlobalVarToken>(token);
     auto var = std::dynamic_pointer_cast<Variable>(token);
     auto literal = std::dynamic_pointer_cast<LiteralToken>(token);
     auto fnCall = std::dynamic_pointer_cast<FunctionCallToken>(token);
@@ -722,22 +741,25 @@ void ExprToken::output(Parser *parser, const VarLocation& varLoc) {
       // Pop one or two operands off the stack, depending on if the
       // operator is unary or binary. Then output the operation in
       // assembly.
-      std::shared_ptr<Token> rhs = operands.top();
+      Operand rhs = operands.top();
       operands.pop();
-      std::shared_ptr<Token> lhs;
+      Operand lhs;
       if (op->isBinary()) {
         lhs = operands.top();
         operands.pop();
       }
-      op->output(parser, lhs, rhs);
-      operands.push(nullptr);
+      Operand result = op->output(parser, lhs, rhs);
+      operands.push(result);
+    } else if (nullptr != global) {
+      // Push the address onto the stack.
+      parser->writeInst("MOVI L " + global->name());
+      parser->writeInst("PUSH L");
+      operands.push(Operand(OperandType::ADDRESS));
     } else if (nullptr != var) {
-      // Save this token because we might actually need the address
-      // instead of the value.
-      operands.push(token);
-      // Push the value of this variable onto the stack for now.
+      // Push nothing onto the stack for a register, or the address onto the
+      // stack for a variable on the stack.
       if (var->isReg()) {
-        parser->writeInst("PUSH " + var->getReg());
+        operands.push(Operand(OperandType::REGISTER, var->getReg()));
       } else {
         // Get the variable's location into register M
         parser->writeInst("MOV M FP");
@@ -750,45 +772,42 @@ void ExprToken::output(Parser *parser, const VarLocation& varLoc) {
             parser->writeInst("SUB M L");
           }
         }
-        // Load the value pointed to by M into M and push it onto the stack.
-        parser->writeInst("LOAD M M");
+        // Push the address onto the stack.
         parser->writeInst("PUSH M");
+        operands.push(Operand(OperandType::ADDRESS));
       }
     } else if (nullptr != literal) {
-      // Push the value of this literal onto the stack.
-      parser->writeInst("MOVI L " + toHexStr(literal->val()));
-      parser->writeInst("PUSH L");
-      // Don't save this token because we won't need it later, just save
-      // a placeholder.
-      operands.push(nullptr);
+      // Don't do anything with the stack, we can save this literal for
+      // later use.
+      operands.push(Operand(OperandType::LITERAL, literal->val()));
     } else if (nullptr != fnCall) {
       // Get the result of the function call and push it onto the stack.
       fnCall->output(parser);
       parser->writeInst("PUSH L");
-      // Don't save this token because we won't need it later, just save
-      // a placeholder.
-      operands.push(nullptr);
+      // The result of a function call is a value token.
+      operands.push(Operand(OperandType::VALUE));
     }
   }
   // Move the evaluated expression output to the given variable location.
   if (varLoc.isReg()) {
-    parser->writeInst("POP " + varLoc.getReg());
+    operandValueToReg(parser, operands.top(), varLoc.getReg());
   } else {
     // Get the variable's address in a register so that we can store to
     // that address.
     int offset = varLoc.getOffset();
     parser->writeInst("MOV M FP");
     if (0 != offset) {
-      parser->writeInst("MOVI L " + toHexStr(0 < offset ? offset : -offset));
-      if (0 < offset) {
-        parser->writeInst("ADD M L");
-      } else {
+      if (offset < 0) {
+        parser->writeInst("MOVI L " + toHexStr(-offset));
         parser->writeInst("SUB M L");
+      } else {
+        parser->writeInst("MOVI L " + toHexStr(offset));
+        parser->writeInst("ADD M L");
       }
     }
     // Pop the result from the expression and store it in the calculated
     // address.
-    parser->writeInst("POP L");
+    operandValueToReg(parser, operands.top(), "L");
     parser->writeInst("STOR L M");
   }
 }

@@ -17,6 +17,26 @@ class Tokenizer;
 class Parser;
 
 /**
+ * A class for operands, used for expression evaluation.
+ */
+enum OperandType { ADDRESS, REGISTER, VALUE, LITERAL };
+class Operand {
+ public:
+  Operand() { }
+  Operand(OperandType type, const std::string& reg = "")
+    : _type(type), _reg(reg) { }
+  Operand(OperandType type, uint16_t literal)
+    : _type(type), _literal(literal) { }
+  OperandType type() const { return _type; }
+  std::string reg() const { return _reg; }
+  uint16_t literal() const { return _literal; }
+ private:
+  OperandType _type;
+  std::string _reg;
+  uint16_t _literal;
+};
+
+/**
  * The base class for all syntax tokens, has a line number and an
  * overridable function for getting the "value" of this token.
  */
@@ -117,11 +137,10 @@ class OperatorToken : public Token {
   uint16_t operate(uint16_t lhs, uint16_t rhs) const;
   /**
    * Outputs assembly code for this operation on the given left hand and
-   * right hand sides.
+   * right hand sides. Returns an operand representing the result, which
+   * will be an address or a value depending on the operation.
    */
-  void output(Parser *parser,
-              const std::shared_ptr<Token>& lhs,
-              const std::shared_ptr<Token>& rhs);
+  Operand output(Parser *parser, const Operand& lhs, const Operand& rhs);
   /**
    * Returns a string representation of the operator.
    */

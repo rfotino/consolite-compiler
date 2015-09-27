@@ -7,6 +7,25 @@
 #include "util.h"
 
 /**
+ * Puts this operand's value in the given register. Only requires
+ * the use of the one register.
+ */
+void operandValueToReg(Parser *parser,
+                       const Operand& operand,
+                       const std::string& reg) {
+  if (OperandType::ADDRESS == operand.type()) {
+    parser->writeInst("POP " + reg);
+    parser->writeInst("LOAD " + reg + " " + reg);
+  } else if (OperandType::REGISTER == operand.type()) {
+    parser->writeInst("MOV " + reg + " " + operand.reg());
+  } else if (OperandType::VALUE == operand.type()) {
+    parser->writeInst("POP " + reg);
+  } else if (OperandType::LITERAL == operand.type()) {
+    parser->writeInst("MOVI " + reg + " " + toHexStr(operand.literal()));
+  }
+}
+
+/**
  * Returns a hex string of the form "0x0000" for the
  * given value, where digits is the number of digits after
  * the "0x".
