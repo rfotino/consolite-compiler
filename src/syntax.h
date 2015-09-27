@@ -387,6 +387,10 @@ class FunctionCallToken : public Token {
              const std::vector<std::shared_ptr<GlobalVarToken>>& globals,
              const std::vector<std::shared_ptr<ParamToken>>& parameters,
              const std::vector<std::shared_ptr<LocalVarToken>>& localVars);
+  /**
+   * Outputs the assembly code for this function call.
+   */
+  void output(Parser *parser);
   std::string funcName() const { return _funcName; }
   size_t numArgs() const { return _arguments.size(); }
  private:

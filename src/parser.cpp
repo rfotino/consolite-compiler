@@ -73,6 +73,16 @@ Parser::Parser(Tokenizer *t) : _tokenizer(t), _bytePos(0) {
       )
     )
   );
+  // Add builtin "uint16 RND()" function.
+  _functions.push_back(
+    std::make_shared<FunctionToken>(
+      FunctionToken(
+        TypeToken("uint16"),
+        "RND",
+        { }
+      )
+    )
+  );
 }
 
 bool Parser::parse() {

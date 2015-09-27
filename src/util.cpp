@@ -66,7 +66,7 @@ bool isLabelDeclaration(const std::string& label) {
  */
 bool isBuiltin(const std::string& funcName) {
   static std::vector<std::string> builtins = { "COLOR", "PIXEL", "TIMERST",
-                                               "TIME", "INPUT" };
+                                               "TIME", "INPUT", "RND" };
   return std::find(builtins.begin(), builtins.end(), funcName) != builtins.end();
 }
 

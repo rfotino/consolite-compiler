@@ -195,6 +195,7 @@ void OperatorToken::output(Parser *parser,
                            const std::shared_ptr<Token>& lhs,
                            const std::shared_ptr<Token>& rhs) {
   // TODO: Output assembly code for the operation.
+  throw "Operation to assembly conversion not yet supported.";
   if (lhs && rhs) {
     parser = parser;
   }
@@ -611,8 +612,9 @@ void ExprToken::output(Parser *parser, const VarLocation& varLoc) {
       // a placeholder.
       operands.push(nullptr);
     } else if (nullptr != fnCall) {
-      // TODO: Get the result of the function call and push it onto the stack.
-      throw "Function call to assembly conversion not yet supported.";
+      // Get the result of the function call and push it onto the stack.
+      fnCall->output(parser);
+      parser->writeInst("PUSH L");
       // Don't save this token because we won't need it later, just save
       // a placeholder.
       operands.push(nullptr);
@@ -753,6 +755,64 @@ bool FunctionCallToken::parse(
     return false;
   }
   return true;
+}
+
+/**
+ * Outputs the assembly code for this function call.
+ */
+void FunctionCallToken::output(Parser *parser) {
+  // Check if the function is a builtin, in which case the assembly
+  // output will look different (with no CALL instruction).
+  if ("COLOR" == _funcName) {
+    // Signature is "void COLOR(uint16 color)"
+    _arguments[0]->output(parser, VarLocation("M"));
+    parser->writeInst("COLOR M");
+  } else if ("PIXEL" == _funcName) {
+    // Signature is "void PIXEL(uint16 x, uint16 y)"
+    _arguments[0]->output(parser, VarLocation("M"));
+    _arguments[1]->output(parser, VarLocation("N"));
+    parser->writeInst("PIXEL M N");
+  } else if ("TIMERST" == _funcName) {
+    // Signatue is "void TIMERST()"
+    parser->writeInst("TIMERST");
+  } else if ("TIME" == _funcName) {
+    // Signature is "uint16 TIME()"
+    parser->writeInst("TIME L");
+  } else if ("INPUT" == _funcName) {
+    // Signature is "uint16 INPUT(uint16 input_id)"
+    _arguments[0]->output(parser, VarLocation("M"));
+    parser->writeInst("INPUT L M");
+  } else if ("RND" == _funcName) {
+    // Signature is "uint16 RND()"
+    parser->writeInst("RND L");
+  } else {
+    // Save registers A through D if we are using them as arguments.
+    std::stack<std::string> savedRegisters;
+    std::string reg = "A";
+    for (size_t i = 0; i < 4 && i < _arguments.size(); i++, reg[0]++) {
+      parser->writeInst("PUSH " + reg);
+      savedRegisters.push(reg);
+    }
+    // Evaluate up to the first four arguments and store them in registers
+    // A through D.
+    reg = "A";
+    for (size_t i = 0; i < 4 && i < _arguments.size(); i++, reg[0]++) {
+      _arguments[i]->output(parser, VarLocation(reg));
+    }
+    // Push any overflow arguments onto the stack. In reverse order so that
+    // it matches the callee's expectations of the order.
+    for (int i = _arguments.size() - 1; 4 <= i; i--) {
+      _arguments[i]->output(parser, VarLocation("L"));
+      parser->writeInst("PUSH L");
+    }
+    // Call the function
+    parser->writeInst("CALL " + _funcName);
+    // Restore registers A through D if they were used as arguments.
+    while (!savedRegisters.empty()) {
+      parser->writeInst("POP " + savedRegisters.top());
+      savedRegisters.pop();
+    }
+  }
 }
 
 /**
@@ -1049,7 +1109,7 @@ void FunctionToken::output(Parser *parser) {
     }
   }
   // Assign registers or stack positions to local variables. Local
-  // variables can be stored in registers "E" through "J", and if there
+  // variables can be stored in registers "E" through "K", and if there
   // are more local variables than can fit in registers we store them
   // as frame pointer offsets. The offset starts at 0 and increases from
   // there.
