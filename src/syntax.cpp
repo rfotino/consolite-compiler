@@ -194,10 +194,160 @@ uint16_t OperatorToken::operate(uint16_t lhs, uint16_t rhs) const {
 void OperatorToken::output(Parser *parser,
                            const std::shared_ptr<Token>& lhs,
                            const std::shared_ptr<Token>& rhs) {
-  // TODO: Output assembly code for the operation.
-  throw "Operation to assembly conversion not yet supported.";
-  if (lhs && rhs) {
-    parser = parser;
+  if (isUnary()) {
+    if ("-" == _op) {
+      // The negative of a 2's complement number x is ~x + 1.
+      parser->writeInst("POP M");
+      parser->writeInst("MOVI N 0xffff");
+      parser->writeInst("XOR M N");
+      parser->writeInst("MOVI N 0x1");
+      parser->writeInst("ADD M N");
+      parser->writeInst("PUSH M");
+    } else if ("*" == _op) {
+      // Dereference operator.
+      parser->writeInst("POP M");
+      parser->writeInst("LOAD M M");
+      parser->writeInst("PUSH M");
+    } else if ("&" == _op) {
+      // Pop the value of the variable, discard it, and push the address
+      // of the variable.
+      parser->writeInst("POP L");
+      parser->writeInst("MOV M FP");
+      int offset = std::dynamic_pointer_cast<Variable>(rhs)->getOffset();
+      if (0 != offset) {
+        if (offset < 0) {
+          parser->writeInst("MOVI L " + toHexStr(-offset));
+          parser->writeInst("SUB M L");
+        } else {
+          parser->writeInst("MOVI L " + toHexStr(offset));
+          parser->writeInst("ADD M L");
+        }
+      }
+      parser->writeInst("PUSH M");
+    } else if ("~" == _op) {
+      // x ^ 0xffff == ~x
+      parser->writeInst("POP M");
+      parser->writeInst("MOVI N 0xffff");
+      parser->writeInst("XOR M N");
+      parser->writeInst("PUSH M");
+    } else if ("!" == _op) {
+      // x = x != 0 ? 1 : 0
+      std::string label1 = parser->getUnusedLabel("label");
+      std::string label2 = parser->getUnusedLabel("label");
+      parser->writeInst("POP M");
+      parser->writeInst("TST M M");
+      parser->writeInst("JNE " + label1);
+      parser->writeInst("MOVI M 0x1");
+      parser->writeInst("JMPI " + label2);
+      parser->writeln(label1 + ":");
+      parser->writeInst("MOVI M 0x0");
+      parser->writeln(label2 + ":");
+      parser->writeInst("PUSH M");
+    } else if ("+" == _op) {
+      // Do nothing.
+    }
+  } else if (isBinary()) {
+    if ("%" == _op) {
+      // a % b == a - (b * (a / b))
+      parser->writeInst("POP N");
+      parser->writeInst("POP M");
+      parser->writeInst("MOV L M");
+      parser->writeInst("DIV M N");
+      parser->writeInst("MUL M N");
+      parser->writeInst("SUB L M");
+      parser->writeInst("PUSH L");
+    } else if ("=" == _op) {
+      (void)lhs;
+      throw "Output of binary assignment not yet supported.";
+    } else if ("+" == _op || "-" == _op || "*" == _op || "/" == _op ||
+               "&" == _op || "|" == _op || "^" == _op ||
+               "<<" == _op || ">>" == _op) {
+      parser->writeInst("POP N");
+      parser->writeInst("POP M");
+      std::string inst;
+      if ("+" == _op) {
+        inst = "ADD";
+      } else if ("-" == _op) {
+        inst = "SUB";
+      } else if ("*" == _op) {
+        inst = "MUL";
+      } else if ("/" == _op) {
+        inst = "DIV";
+      } else if ("&" == _op) {
+        inst = "ADD";
+      } else if ("|" == _op) {
+        inst = "OR";
+      } else if ("^" == _op) {
+        inst = "XOR";
+      } else if ("<<" == _op) {
+        inst = "SHL";
+      } else if (">>" == _op) {
+        inst = "SHRL";
+      }
+      parser->writeInst(inst + " M N");
+      parser->writeInst("PUSH M");
+    } else if ("[" == _op) {
+      throw "Output of array indexing not yet supported.";
+    } else if ("||" == _op || "&&" == _op) {
+      // Make N either 0 or 1.
+      std::string label1 = parser->getUnusedLabel("label");
+      std::string label2 = parser->getUnusedLabel("label");
+      parser->writeInst("POP N");
+      parser->writeInst("TST N N");
+      parser->writeInst("JEQ " + label1);
+      parser->writeInst("MOVI N 0x1");
+      parser->writeInst("JMPI " + label2);
+      parser->writeln(label1 + ":");
+      parser->writeInst("MOVI N 0x0");
+      parser->writeln(label2 + ":");
+      // Make M either 0 or 1.
+      std::string label3 = parser->getUnusedLabel("label");
+      std::string label4 = parser->getUnusedLabel("label");
+      parser->writeInst("POP M");
+      parser->writeInst("TST M M");
+      parser->writeInst("JEQ " + label3);
+      parser->writeInst("MOVI M 0x1");
+      parser->writeInst("JMPI " + label4);
+      parser->writeln(label3 + ":");
+      parser->writeInst("MOVI M 0x0");
+      parser->writeln(label4 + ":");
+      // Do the operation.
+      if ("||" == _op) {
+        parser->writeInst("OR M N");
+      } else if ("&&" == _op) {
+        parser->writeInst("AND M N");
+      }
+      // Push the result.
+      parser->writeInst("PUSH M");
+    } else if ("<" == _op || "<=" == _op || ">" == _op || ">=" == _op ||
+               "==" == _op || "!=" == _op) {
+      std::string label1 = parser->getUnusedLabel("label");
+      std::string label2 = parser->getUnusedLabel("label");
+      parser->writeInst("POP N");
+      parser->writeInst("POP M");
+      parser->writeInst("CMP M N");
+      std::string inst;
+      if ("<" == _op) {
+        inst = "JB";
+      } else if ("<=" == _op) {
+        inst = "JBE";
+      } else if (">" == _op) {
+        inst = "JA";
+      } else if (">=" == _op) {
+        inst = "JAE";
+      } else if ("==" == _op) {
+        inst = "JEQ";
+      } else if ("!=" == _op) {
+        inst = "JNE";
+      }
+      parser->writeInst(inst + " " + label1);
+      parser->writeInst("MOVI M 0x0");
+      parser->writeInst("JMPI " + label2);
+      parser->writeln(label1 + ":");
+      parser->writeInst("MOVI M 0x1");
+      parser->writeln(label2 + ":");
+      parser->writeInst("PUSH M");
+    }
   }
 }
 
