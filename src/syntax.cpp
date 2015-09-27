@@ -1087,7 +1087,6 @@ void FunctionToken::output(Parser *parser) {
   // Create an end label for the function, so if we return we can jump
   // to it without having to unwind the stack each time.
   std::string endLabel = parser->getUnusedLabel(_name + "_end");
-  parser->addLabel(endLabel);
   // Create a label for the function so that we can CALL it.
   parser->writeln(_name + ":");
   // Assign registers or stack positions to parameters. Parameters can
@@ -1162,7 +1161,6 @@ void FunctionToken::output(Parser *parser) {
   // Assign assembly-level labels to all label declarations.
   for (auto label : _labels) {
     std::string asmLabel = parser->getUnusedLabel(_name + "_" + label->name());
-    parser->addLabel(asmLabel);
     label->setAsmLabel(asmLabel);
   }
 
@@ -1632,13 +1630,25 @@ void IfStatement::output(Parser *parser,
                          const std::string& returnLabel,
                          const std::string& breakLabel,
                          const std::string& continueLabel) {
-  (void)parser;
-  (void)function;
-  (void)returnLabel;
-  (void)breakLabel;
-  (void)continueLabel;
-  // TODO: Implement if statement output.
-  throw "If statement to assembly conversion not yet implemented.";
+  std::string falseLabel = parser->getUnusedLabel(function->name() + "_if_false");
+  std::string endLabel = parser->getUnusedLabel(function->name() + "_if_end");
+  // Test the condition and jump to the false label if it is false.
+  _condExpr.output(parser, VarLocation("L"));
+  parser->writeInst("TST L L");
+  parser->writeInst("JEQ " + falseLabel);
+  // Output the true statement and jump to the end.
+  _trueStatement->output(parser, function, returnLabel, breakLabel,
+                         continueLabel);
+  parser->writeInst("JMPI " + endLabel);
+  // Output the false statement label and the false statement.
+  parser->writeln(falseLabel + ":");
+  if (nullptr != _falseStatement) {
+    _falseStatement->output(parser, function, returnLabel, breakLabel,
+                            continueLabel);
+  }
+  // Output the end label that the true statement uses to jump over the
+  // false statement.
+  parser->writeln(endLabel + ":");
 }
 
 /**

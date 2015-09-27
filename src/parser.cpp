@@ -147,11 +147,9 @@ bool Parser::output(char *filename) {
   // then goes into an infinite loop to prevent attempting to execute
   // code that wasn't meant to be executed.
   std::string stackLabel = this->getUnusedLabel("stack");
-  this->addLabel(stackLabel);
   this->writeInst("MOVI SP " + stackLabel);
   this->writeInst("CALL main");
   std::string finishedLabel = this->getUnusedLabel("program_finished");
-  this->addLabel(finishedLabel);
   this->writeln(finishedLabel + ":");
   this->writeInst("JMPI " + finishedLabel);
   // Output global variables.
