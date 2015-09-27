@@ -1455,6 +1455,10 @@ bool LocalVarToken::parse(
  * assembly code to initialize the variable.
  */
 void LocalVarToken::output(Parser *parser) {
+  // If there is no initial value, do nothing.
+  if (_initExprs.empty()) {
+    return;
+  }
   if (_type.isArray()) {
     // Store the location of the array at the variable's location.
     if (this->isReg()) {
