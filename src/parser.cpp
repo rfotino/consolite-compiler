@@ -204,6 +204,5 @@ void Parser::writeData(const std::string& data, int dataLength) {
 }
 
 void Parser::writeln(const std::string& line) {
-  std::cout << line << std::endl;
   _outfile << line << std::endl;
 }
