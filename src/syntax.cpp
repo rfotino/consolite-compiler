@@ -472,7 +472,8 @@ bool ExprToken::parse(
       // Determine if the operator is binary or unary.
       if (op->maybeBinary() && (")" == prev || "val" == prev)) {
         op->setBinary();
-      } else if (op->maybeUnary() && (prev.empty() || "op" == prev)) {
+      } else if (op->maybeUnary() &&
+                 (prev.empty() || "(" == prev || "op" == prev)) {
         op->setUnary();
       } else {
         _error("Unexpected token '" + t.str() + "' in expression.", t.line());
