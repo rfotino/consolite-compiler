@@ -205,8 +205,13 @@ Operand OperatorToken::output(Parser *parser,
       parser->writeInst("PUSH M");
       return Operand(OperandType::VALUE);
     } else if ("*" == _op) {
-      // Dereference operator. Do nothing because the address of the operand
-      // is already on the stack.
+      // Dereference operator. Do nothing for value operands, because
+      // we would just be popping them off and pushing them back onto
+      // the stack.
+      if (OperandType::VALUE != rhs.type()) {
+        operandValueToReg(parser, rhs, "M");
+        parser->writeInst("PUSH M");
+      }
       return Operand(OperandType::ADDRESS);
     } else if ("&" == _op) {
       // Do nothing, the value should already be on the stack.
@@ -257,10 +262,10 @@ Operand OperatorToken::output(Parser *parser,
       operandValueToReg(parser, rhs, "N");
       if (OperandType::ADDRESS == lhs.type()) {
         parser->writeInst("POP M");
-        parser->writeInst("STOR M N");
+        parser->writeInst("STOR N M");
       } else if (OperandType::REGISTER == lhs.type()) {
         parser->writeInst("MOV " + lhs.reg() + " N");
-      } else if (OperandType::VALUE == lhs.type()) {
+      } else {
         throw "Left hand side of assignment cannot be an rvalue.";
       }
       parser->writeInst("PUSH N");
