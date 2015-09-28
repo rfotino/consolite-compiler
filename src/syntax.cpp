@@ -280,7 +280,7 @@ Operand OperatorToken::output(Parser *parser,
       } else if ("/" == _op) {
         inst = "DIV";
       } else if ("&" == _op) {
-        inst = "ADD";
+        inst = "AND";
       } else if ("|" == _op) {
         inst = "OR";
       } else if ("^" == _op) {
@@ -1261,10 +1261,10 @@ void FunctionToken::output(Parser *parser) {
   // Assign registers or stack positions to parameters. Parameters can
   // be stored in registers "A" through "D", and if there are more than
   // 4 parameters they will be stored on the stack before the return
-  // address. The return address is stored at FP - 4, so the first
-  // overflow parameter will be stored at -6, the next at -8, etc.
+  // address. The return address is stored at FP, so the first
+  // overflow parameter will be stored at -2, the next at -4, etc.
   std::string reg = "A";
-  int offset = -(INST_SIZE + DATA_SIZE);
+  int offset = -ADDRESS_SIZE;
   int numOverflowParams = 0;
   for (auto param : _parameters) {
     if (reg[0] <= 'D') {
@@ -1283,16 +1283,15 @@ void FunctionToken::output(Parser *parser) {
   // there.
   reg = "E";
   offset = 0;
+  int extraParamOffset = 0;
   for (auto local : _localVars) {
     if (reg[0] <= 'K' && local->canBeReg()) {
       local->setReg(reg);
-      // If this is a callee-saved register, push it onto the stack and
-      // make a note that we need to pop it later. Registers greater than
-      // D are callee-saved.
-      if ('D' < reg[0]) {
-        parser->writeInst("PUSH " + reg);
-        _savedRegisters.push(reg);
-      }
+      // This is a callee-saved register, push it onto the stack and
+      // make a note that we need to pop it later.
+      parser->writeInst("PUSH " + reg);
+      _savedRegisters.push(reg);
+      extraParamOffset -= DATA_SIZE;
       // Increment the register
       reg[0]++;
     } else {
@@ -1305,15 +1304,23 @@ void FunctionToken::output(Parser *parser) {
       offset += local->type().arraySize() * DATA_SIZE;
     }
   }
+  // Save the previous value of the frame pointer.
+  parser->writeInst("PUSH FP");
+  _savedRegisters.push("FP");
+  extraParamOffset -= DATA_SIZE;
   // Set the frame pointer to the stack's current location.
   parser->writeInst("MOV FP SP");
   // Store parameters on the stack if they are currently stored in
-  // registers but are flagged as needing their own address.
+  // registers but are flagged as needing their own address. Also fix
+  // offset for parameters on the stack based on the number of saved
+  // registers.
   for (auto param : _parameters) {
     if (param->isReg() && !param->canBeReg()) {
       parser->writeInst("PUSH " + param->getReg());
       param->setOffset(offset);
       offset += DATA_SIZE;
+    } else if (!param->isReg()) {
+      param->setOffset(param->getOffset() + extraParamOffset);
     }
   }
   // Reserve space for the local variable storage on the stack.
