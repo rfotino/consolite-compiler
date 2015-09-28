@@ -19,16 +19,15 @@ Comment syntax is the same as in C, single line comments start with `//` while m
 
 ### Primitives
 
-Consolite C currently has only two primitive data types, though I hope to expand on that eventually.
+Consolite C currently has only one primitive data type, though I hope to expand on that eventually by adding signed 16-bit values, signed/unsigned 8-bit values, and floating point values.
 
-| Name | Description | Size | Value Range | Use Case |
-|------|-------------|------|-------------|----------|
-| uint16 | An unsigned 16-bit integer. | 2 bytes | [0, 65535]      | Non negative data or addresses.        |
-| int16  | A signed 16-bit integer.    | 2 bytes | [-32768, 32767] | Arithmetic, data that can be negative. |
+| Name   | Description                 | Size    | Value Range |
+|--------|-----------------------------|---------|-------------|
+| uint16 | An unsigned 16-bit integer. | 2 bytes | [0, 65535]  |
 
 ### Arrays
 
-Arrays in Consolite C must have a constant size that can be determined at compile time. Arrays cannot be multi-dimensional. For example:
+Arrays in Consolite C must have a constant size that can be determined at compile time. The size of an array can contain arithmetic with global variables, and the compiler will use the *initial value* of those global variables to determine the array size. I hope to expand on this by adding a `const` keyword eventually. Arrays cannot be multi-dimensional. For example:
 
 ```c
 // Declares an array of initialized int16 values.
@@ -51,7 +50,13 @@ A valid variable name starts with an underscore or an alphabetic character, and 
 
 Variables have either global scope or they have scope local to a function. Loops and code blocks surrounded with `{ }` do not have their own scope, but have the same scope as the containing function.
 
-Uninitialized global variables will be zeroed out by default, since they won't use the stack. The values of uninitialized local variables are indeterminate, since it depends on what was on the stack leading up to the allocation of storage for the local variable.
+### Global Variables
+
+Global variables are declared outside of a function, and if they have an initial value it must be known at compile time. This means the initialization expression cannot use any dereferencing operators, address-of operators, assignment operators, function calls. Uninitialized global variables will have an initial value of zero.
+
+### Local Variables
+
+Local variables must be declared at the top of a function, before any other statements. They can include an initial value, which does not need to be known at compile-time. The values of uninitialized local variables are indeterminate, since they depend on what was on the stack leading up to the allocation of storage for the local variable.
 
 ## Control Flow
 
@@ -215,12 +220,12 @@ Valid function names have the same rules as valid variable names. Functions must
 Syntax:
 
 ```c
-[return-value] [function-name] ([param1], [param2], ...) {
+[return-type] [function-name] ([param1], [param2], ...) {
   [function-body]
 }
 ```
 
-The `[return-value]` can be either a primitive data type or `void`, which indicates no return value. If there is a return value other than `void`, then the function must return a value for every possible code path. In a `void` function, using the `return;` statement will leave the function without executing any more statements.
+The `[return-type]` can be either a primitive data type or `void`, which indicates no return value. Array return types are not allowed. If the return type of a function is not `void` and the function does not contain a `return` statement for every possible code path, the compiler will not catch this and the return value will be garbage. In a `void` function, using the `return;` statement will leave the function without executing any more statements.
 
 Each parameter has a primitive data type followed by a variable name. Arrays can be passed as an address pointing to the start of the array, with another parameter indicating the array's size.
 
@@ -255,7 +260,7 @@ void paint_rectangle(uint16 color,
 
 ### Entry Point
 
-The entry point of a program in Consolite C is a `main()` function, which takes no arguments and has a return type of void. For example:
+The entry point of a program in Consolite C is a `main()` function, which takes no arguments and has a return type of void. The entry point cannot be called recursively, and it cannot be called from any other point in the program. For example:
 
 ```c
 void main() {
@@ -270,6 +275,7 @@ void main() {
 * `void TIMERST()` Resets the system time to zero.
 * `uint16 TIME()` Returns the time in milliseconds since the last call to `TIMERST()`, modulo 2^16.
 * `uint16 INPUT(uint16 input_id)` Returns the value of the input at the given `input_id`.
+* `uint16 RND()` Returns a random 16-bit value.
 
 ## Operators
 
@@ -294,8 +300,8 @@ void main() {
 ### Boolean
 
 * Unary `!`, yields 1 if the operand is 0, or 0 otherwise.
-* Binary `&&`, yields 1 if the operands are both true, or 0 otherwise.
-* Binary `||`, yields 1 if at least one of the operands is true, or 0 otherwise.
+* Binary `&&`, yields 1 if the operands are both true, or 0 otherwise. Does not short-circuit; the expression `func1() && func2()` will call `func2()` even if `func1()` returns false.
+* Binary `||`, yields 1 if at least one of the operands is true, or 0 otherwise. Does not short-circuit; the expression `func1() || func2()` will call `func2()` even if `func1()` returns true.
 * Binary `<`, yields 1 if the first operand is less than the second. If one or both of the operands is a signed type, both of the operands will be treated as signed.
 * Binary `<=`, yields 1 if the first operand is less than or equal to the second. If one or both of the operands is a signed type, both of the oeprands will be treated as signed.
 * Binary `>`, yields 1 if the first operand is greater than the second. If one or both of the operands is a signed type, both of the oeprands will be treated as signed.
@@ -306,4 +312,4 @@ void main() {
 ### Addresses
 
 * Unary `&`, yields the address of the given variable.
-* Unary `*`, yields the value at the address stored in the given variable. If used on the left hand side of an assignment statement such as `*x = 0;`, then the value is awritten to the location that x points to, rather than x itself.
+* Unary `*`, yields the value at the address stored in the given variable. If used on the left hand side of an assignment statement such as `*x = 0;`, then the value is written to the location that x points to, rather than x itself.
