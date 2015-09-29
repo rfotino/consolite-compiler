@@ -19,6 +19,7 @@
 bool LiteralToken::parse(const AtomToken& token) {
   _lineNum = token.line();
   if (std::regex_match(token.str(), std::regex("^0[xX][0-9a-fA-F]+$"))) {
+    // Matched hex
     _value = 0;
     for (size_t i = 2; i < token.str().size(); i++) {
       char c = token.str().at(i);
@@ -27,7 +28,14 @@ bool LiteralToken::parse(const AtomToken& token) {
         ('a' <= c && c <= 'f') ? (c - 'a' + 10) : (c - 'A' + 10);
       _value = (_value * 16) + hexVal;
     }
+  } else if (std::regex_match(token.str(), std::regex("^0[bB][01]+$"))) {
+    // Matched binary
+    _value = 0;
+    for (size_t i = 2; i < token.str().size(); i++) {
+      _value = (_value * 2) + (token.str().at(i) - '0');
+    }
   } else if (std::regex_match(token.str(), std::regex("^[0-9]+$"))) {
+    // Matched decimal
     _value = 0;
     for (size_t i = 0; i < token.str().size(); i++) {
       char c = token.str().at(i);
