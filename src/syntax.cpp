@@ -599,7 +599,7 @@ bool ExprToken::parse(
 bool ExprToken::_validate() {
   std::stack<std::string> operands;
   for (auto token : _postfix) {
-    std::shared_ptr<OperatorToken> op;
+    auto op = std::dynamic_pointer_cast<OperatorToken>(token);
     if (std::dynamic_pointer_cast<LiteralToken>(token) ||
         std::dynamic_pointer_cast<FunctionCallToken>(token)) {
       operands.push("rvalue");
@@ -607,7 +607,7 @@ bool ExprToken::_validate() {
                std::dynamic_pointer_cast<ParamToken>(token) ||
                std::dynamic_pointer_cast<LocalVarToken>(token)) {
       operands.push("lvalue");
-    } else if (op = std::dynamic_pointer_cast<OperatorToken>(token)) {
+    } else if (nullptr != op) {
       std::string rhs = operands.top();
       operands.pop();
       std::string lhs;
@@ -651,7 +651,7 @@ void ExprToken::_evaluate() {
   // Evaluate the postfix expression
   std::stack<std::shared_ptr<Token>> operands;
   for (auto token : _postfix) {
-    std::shared_ptr<OperatorToken> op;
+    auto op = std::dynamic_pointer_cast<OperatorToken>(token);
     if (std::dynamic_pointer_cast<LiteralToken>(token) ||
         std::dynamic_pointer_cast<GlobalVarToken>(token)) {
       operands.push(token);
@@ -663,7 +663,7 @@ void ExprToken::_evaluate() {
       // so this expression can't be constant.
       _const = false;
       return;
-    } else if (op = std::dynamic_pointer_cast<OperatorToken>(token)) {
+    } else if (nullptr != op) {
       std::shared_ptr<Token> rhs = operands.top();
       operands.pop();
       std::shared_ptr<Token> lhs;
@@ -1644,7 +1644,11 @@ bool LocalVarToken::parse(
  * If an initial value is set for this local variable, this outputs the
  * assembly code to initialize the variable.
  */
-void LocalVarToken::output(Parser *parser) {
+void LocalVarToken::output(Parser *parser,
+			   const std::shared_ptr<FunctionToken>&,
+			   const std::string&,
+			   const std::string&,
+			   const std::string&) {
   // If there is no initial value, do nothing.
   if (_initExprs.empty()) {
     return;

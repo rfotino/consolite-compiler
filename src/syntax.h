@@ -494,7 +494,11 @@ class LocalVarToken : public StatementToken, public Variable {
    * If an initial value is set for this local variable, this outputs the
    * assembly code to initialize the variable.
    */
-  void output(Parser *parser);
+  void output(Parser *parser,
+	      const std::shared_ptr<FunctionToken>& = nullptr,
+	      const std::string& = "",
+	      const std::string& = "",
+	      const std::string& = "");
   /**
    * Sets the location of the start of data as an offset from the frame pointer,
    * used for array variables.
