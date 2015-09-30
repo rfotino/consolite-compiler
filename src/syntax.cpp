@@ -308,8 +308,8 @@ Operand OperatorToken::output(Parser *parser,
       return Operand(OperandType::VALUE);
     } else if ("[" == _op) {
       // For x[a], push &x + (a * DATA_SIZE) onto the stack.
-      operandValueToReg(parser, lhs, "M");
       operandValueToReg(parser, rhs, "N");
+      operandValueToReg(parser, lhs, "M");
       parser->writeInst("MOVI L " + toHexStr(DATA_SIZE));
       parser->writeInst("MUL N L");
       parser->writeInst("ADD M N");
