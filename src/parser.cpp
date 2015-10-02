@@ -191,6 +191,28 @@ std::string Parser::getUnusedLabel(const std::string& label) {
 }
 
 void Parser::writeInst(const std::string& inst) {
+  // We want to optimize a PUSH followed by a POP by either
+  // removing it entirely or by turning it into a single MOV
+  // instruction.
+  if (_pendingPushReg.empty() &&
+      0 == inst.compare(0, std::string("PUSH").size(), "PUSH")) {
+    // It is a PUSH instruction and there are no pending push instructions.
+    // We need to save the register and write nothing, because the next
+    // instruction could be a POP.
+    _pendingPushReg = inst.substr(std::string("PUSH ").size());
+    return;
+  } else if (!_pendingPushReg.empty() &&
+             0 == inst.compare(0, std::string("POP").size(), "POP")) {
+    // It is a POP instruction and the previous instruction was a PUSH.
+    // We can optimize this into nothing or a MOV instruction.
+    std::string popReg = inst.substr(std::string("POP ").size());
+    std::string pushReg = _pendingPushReg;
+    _pendingPushReg = "";
+    if (popReg != pushReg) {
+      this->writeInst("MOV " + popReg + " " + pushReg);
+    }
+    return;
+  }
   this->writeln("        " + inst);
   _bytePos += INST_SIZE;
 }
@@ -204,5 +226,12 @@ void Parser::writeData(const std::string& data, int dataLength) {
 }
 
 void Parser::writeln(const std::string& line) {
+  // If there is a pending PUSH instruction, first write it
+  // to the outfile.
+  if (!_pendingPushReg.empty()) {
+    _outfile << "        PUSH " << _pendingPushReg << std::endl;
+    _pendingPushReg = "";
+  }
+  // Then write the new line.
   _outfile << line << std::endl;
 }

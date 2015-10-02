@@ -62,6 +62,11 @@ class Parser {
   std::vector<std::shared_ptr<FunctionToken>> _functions;
   std::ofstream _outfile;
   /**
+   * The register that was most recently requested to be PUSHed onto
+   * the stack. Used for optimizing the PUSH followed by POP pattern.
+   */
+  std::string _pendingPushReg;
+  /**
    * A list of assembly-level labels that have already been used.
    * These are saved so that we don't have conflicting label names.
    */
