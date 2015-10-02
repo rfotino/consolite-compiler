@@ -1314,7 +1314,10 @@ void FunctionToken::output(Parser *parser) {
     }
     // If this is an array, reserve space for the array's data.
     if (local->type().isArray()) {
-      local->setDataOffset(offset);
+      // The data offset is at the current stack offset + DATA_SIZE.
+      // We must add DATA_SIZE because the stack pointer points at an
+      // address that's in use, and we want the next unused address.
+      local->setDataOffset(offset + DATA_SIZE);
       offset += local->type().arraySize() * DATA_SIZE;
     }
   }
@@ -1649,10 +1652,8 @@ void LocalVarToken::output(Parser *parser,
 			   const std::string&,
 			   const std::string&,
 			   const std::string&) {
-  // If there is no initial value, do nothing.
-  if (_initExprs.empty()) {
-    return;
-  }
+  // If this is an array, store the address of the data in the variable's
+  // location.
   if (_type.isArray()) {
     // Store the location of the array at the variable's location.
     if (this->isReg()) {
@@ -1660,7 +1661,7 @@ void LocalVarToken::output(Parser *parser,
       parser->writeInst("MOV " + this->getReg() + " FP");
       if (0 != _dataOffset) {
         parser->writeInst("MOVI L " + toHexStr(_dataOffset));
-        parser->writeInst("ADD " + this->getReg() + "L");
+        parser->writeInst("ADD " + this->getReg() + " L");
       }
     } else {
       // Store FP + _offset in M
@@ -1679,6 +1680,13 @@ void LocalVarToken::output(Parser *parser,
       // the frame pointer.
       parser->writeInst("STOR N M");
     }
+  }
+  // If there is no initial value, do nothing else.
+  if (_initExprs.empty()) {
+    return;
+  }
+  // Store initial values.
+  if (_type.isArray()) {
     for (size_t i = 0; i < _initExprs.size(); i++) {
       // Output initial expressions for each element.
       _initExprs[i]->output(parser, VarLocation(_dataOffset + (DATA_SIZE * i)));
