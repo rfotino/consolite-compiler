@@ -348,9 +348,7 @@ uint16 intersects_fallen_pieces(uint16 positions) {
         BOARD_HEIGHT <= positions[i2p1]) {
       continue;
     }
-    // BUG: can't do double array index
-    j = (positions[i2p1]*BOARD_WIDTH)+positions[i2];
-    if (0 != fallen_pieces[j]) {
+    if (0 != fallen_pieces[(positions[i2p1]*BOARD_WIDTH)+positions[i2]]) {
       return true;
     }
   }
@@ -455,10 +453,7 @@ uint16 check_lines() {
     // Iterate over all positions in the current row.
     complete = true;
     for (i = 0; i < BOARD_WIDTH; i = i + 1) {
-      // BUG: Using a global in the RHS of an array indexing operator didn't
-      // work.
-      a = (j*BOARD_WIDTH)+i;
-      if (NULL_PIECE == fallen_pieces[a]) {
+      if (NULL_PIECE == fallen_pieces[(j*BOARD_WIDTH)+i]) {
         complete = false;
         break;
       }
@@ -496,7 +491,6 @@ uint16 check_lines() {
 void add_to_fallen_pieces() {
   uint16[10] positions;
   uint16 i;
-  uint16 j;
   uint16 i2;
   uint16 i2p1;
   uint16 lines_complete;
@@ -504,9 +498,7 @@ void add_to_fallen_pieces() {
   for (i = 0; i < 4; i = i + 1) {
     i2 = i * 2;
     i2p1 = i2 + 1;
-    // We have to use J due to a bug where we can't do double array indexing
-    j = (positions[i2p1]*BOARD_WIDTH)+positions[i2];
-    fallen_pieces[j] = cur_piece;
+    fallen_pieces[(positions[i2p1]*BOARD_WIDTH)+positions[i2]] = cur_piece;
   }
   // Check lines for completion.
   lines_complete = check_lines();
