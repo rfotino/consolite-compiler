@@ -69,7 +69,7 @@ uint16 DIGIT_WIDTH = 3;
 uint16 DIGIT_HEIGHT = 5;
 uint16 DIGIT_SCALE = 2;
 uint16 DIGIT_PADDING = 1;
-uint16 DIGITS_IN_SCORE = 4;
+uint16 DIGITS_IN_SCORE = 5;
 
 /**
  * The screen width and height in pixels.
@@ -439,36 +439,55 @@ void move_down() {
 }
 
 /**
- * Checks a line to see if it is complete, and if so  removes the line and
- * increments the score.
+ * Checks all lines for completeness and returns the number of lines
+ * that were complete. Removes the complete rows and shifts them down.
  */
-void check_line(uint16 y) {
+uint16 check_lines() {
   uint16 i;
   uint16 j;
+  uint16 k;
   uint16 a;
   uint16 b;
-  for (i = 0; i < BOARD_WIDTH; i = i + 1) {
-    // BUG: Using a global in the RHS of an array indexing operator didn't
-    // work.
-    j = (y*BOARD_WIDTH)+i;
-    if (NULL_PIECE == fallen_pieces[j]) {
-      return;
-    }
-  }
-  set_score(score + 1);
-  // Shift the upper rows down.
-  for (j = y; 0 < j; j = j - 1) {
+  uint16 lines_complete = 0;
+  uint16 complete;
+  // Iterate over rows, starting at the bottom and moving toward the top.
+  for (j = BOARD_HEIGHT - 1; -1 != j; j = j - 1) {
+    // Iterate over all positions in the current row.
+    complete = true;
     for (i = 0; i < BOARD_WIDTH; i = i + 1) {
+      // BUG: Using a global in the RHS of an array indexing operator didn't
+      // work.
       a = (j*BOARD_WIDTH)+i;
-      b = ((j-1)*BOARD_WIDTH)+i;
-      fallen_pieces[a] = fallen_pieces[b];
-      paint_piece_at(i, j, fallen_pieces[a]);
+      if (NULL_PIECE == fallen_pieces[a]) {
+        complete = false;
+        break;
+      }
+    }
+    if (complete) {
+      // Shift the upper rows down.
+      for (k = j; 0 < k; k = k - 1) {
+        for (i = 0; i < BOARD_WIDTH; i = i + 1) {
+          a = (k*BOARD_WIDTH)+i;
+          b = ((k-1)*BOARD_WIDTH)+i;
+          // Don't repaint unnecessarily.
+          if (fallen_pieces[a] != fallen_pieces[b]) {
+            fallen_pieces[a] = fallen_pieces[b];
+            paint_piece_at(i, k, fallen_pieces[a]);
+          }
+        }
+      }
+      // Paint the upper row black.
+      for (i = 0; i < BOARD_WIDTH; i = i + 1) {
+        fallen_pieces[i] = NULL_PIECE;
+        paint_piece_at(i, 0, NULL_PIECE);
+      }
+      // Check the current line again.
+      j = j + 1;
+      // Increment the return value.
+      lines_complete = lines_complete + 1;
     }
   }
-  // Paint the upper row black.
-  for (i = 0; i < BOARD_WIDTH; i = i + 1) {
-    fallen_pieces[i] = NULL_PIECE;
-  }
+  return lines_complete;
 }
 
 /**
@@ -480,6 +499,7 @@ void add_to_fallen_pieces() {
   uint16 j;
   uint16 i2;
   uint16 i2p1;
+  uint16 lines_complete;
   get_piece_positions(positions, cur_piece, cur_pos_x, cur_pos_y, cur_rot);
   for (i = 0; i < 4; i = i + 1) {
     i2 = i * 2;
@@ -489,8 +509,16 @@ void add_to_fallen_pieces() {
     fallen_pieces[j] = cur_piece;
   }
   // Check lines for completion.
-  for (i = 0; i < 4; i = i + 1) {
-    check_line(positions[(i*2)+1]);
+  lines_complete = check_lines();
+  // Add the correct value to the score.
+  if (4 == lines_complete) {
+    set_score(score + 1200);
+  } else if (3 == lines_complete) {
+    set_score(score + 300);
+  } else if (2 == lines_complete) {
+    set_score(score + 100);
+  } else if (1 == lines_complete) {
+    set_score(score + 40);
   }
   // Increase the speed by decreasing the number of milliseconds between
   // drops, up to a minimum of 300 milliseconds.
