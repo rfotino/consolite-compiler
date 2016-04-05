@@ -26,7 +26,3 @@ library. To build the project just type `make`.
 ## Usage
 
 `./compiler SRC DEST`
-
-## Copyright
-
-Copyright (c) 2015 Robert Fotino, All Rights Reserved
