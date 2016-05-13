@@ -5,6 +5,7 @@
 
 #include <iostream>
 #include <regex>
+#include <cmath>
 #include "parser.h"
 #include "tokenizer.h"
 #include "syntax.h"
@@ -310,8 +311,10 @@ Operand OperatorToken::output(Parser *parser,
       // For x[a], push &x + (a * DATA_SIZE) onto the stack.
       operandValueToReg(parser, rhs, "N");
       operandValueToReg(parser, lhs, "M");
-      parser->writeInst("MOVI L " + toHexStr(DATA_SIZE));
-      parser->writeInst("MUL N L");
+      // Assume DATA_SIZE is a power of 2, and do a fast
+      // multiply by shifting left
+      parser->writeInst("MOVI L " + toHexStr(ceil(log2(DATA_SIZE))));
+      parser->writeInst("SHL N L");
       parser->writeInst("ADD M N");
       parser->writeInst("PUSH M");
       return Operand(OperandType::ADDRESS);
