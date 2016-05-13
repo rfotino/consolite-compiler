@@ -6,11 +6,11 @@
 /**
  * CONSTANTS (these should be #defines, but there is no preprocessor yet)
  */
-uint16 KEY_SPACE = 0;
-uint16 KEY_UP    = 1;
-uint16 KEY_LEFT  = 2;
-uint16 KEY_DOWN  = 3;
-uint16 KEY_RIGHT = 4;
+uint16[2] KEY_SPACE = { 0, 46 };
+uint16[2] KEY_UP    = { 1, 54 };
+uint16[2] KEY_LEFT  = { 2, 52 };
+uint16[2] KEY_DOWN  = { 3, 51 };
+uint16[2] KEY_RIGHT = { 4, 53 };
 
 uint16 NULL_PIECE = 0;
 uint16 I_PIECE    = 1;
@@ -558,7 +558,7 @@ void play_game() {
   while (1) {
     // Check for left key pressed, in which case we should try to
     // move the current piece left.
-    left_pressed = INPUT(KEY_LEFT);
+    left_pressed = INPUT(KEY_LEFT[0]) || INPUT(KEY_LEFT[1]);
     if (left_pressed && !left_pressed_prev) {
       // Check if we can go left, then go left.
       if (can_move_left()) {
@@ -571,7 +571,7 @@ void play_game() {
 
     // Check for right key pressed, in which case we should try to
     // move the current piece right.
-    right_pressed = INPUT(KEY_RIGHT);
+    right_pressed = INPUT(KEY_RIGHT[0]) || INPUT(KEY_RIGHT[1]);;
     if (right_pressed && !right_pressed_prev) {
       // Check if we can go right, then go right.
       if (can_move_right()) {
@@ -584,7 +584,7 @@ void play_game() {
 
     // Check for up key pressed, in which case we should try to
     // rotate the current piece.
-    up_pressed = INPUT(KEY_UP);
+    up_pressed = INPUT(KEY_UP[0]) || INPUT(KEY_UP[1]);
     if (up_pressed && !up_pressed_prev) {
       // Check if we can rotate, then rotate.
       if (can_rotate()) {
@@ -598,7 +598,7 @@ void play_game() {
 
     // Check for down key press, in which case we should try to move
     // the current piece down one.
-    down_pressed = INPUT(KEY_DOWN);
+    down_pressed = INPUT(KEY_DOWN[0]) || INPUT(KEY_DOWN[1]);
     if (down_pressed && !down_pressed_prev) {
       // Check if we can move down, then move down.
       if (can_move_down()) {
@@ -610,7 +610,7 @@ void play_game() {
 
     // Check for the spacebar pressed, in which case we should drop the
     // piece down all the way.
-    space_pressed = INPUT(KEY_SPACE);
+    space_pressed = INPUT(KEY_SPACE[0]) || INPUT(KEY_SPACE[1]);
     if (space_pressed && !space_pressed_prev) {
       drop_down();
     }
@@ -642,11 +642,15 @@ void play_game() {
  * Do nothing while waiting for the key with the given input_id to be
  * pressed.
  */
-void wait_for_key(uint16 input_id) {
+void wait_for_key(uint16 input_ids, uint16 num_ids) {
   uint16 currently_down = false;
   uint16 previously_down = true;
+  uint16 i;
   while (true) {
-    currently_down = INPUT(input_id);
+    currently_down = false;
+    for (i = 0; i < num_ids; i = i + 1) {
+      currently_down = currently_down || INPUT(input_ids[i]);
+    }
     if (currently_down && !previously_down) {
       return;
     }
@@ -665,7 +669,7 @@ void main() {
   // Play the game repeatedly.
   while (true) {
     // Start in the game over state, wait for a spacebar press
-    wait_for_key(KEY_SPACE);
+    wait_for_key(KEY_SPACE, 2);
     // Reset everything.
     reset_game();
     // Enter the game loop.
