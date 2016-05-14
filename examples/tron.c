@@ -442,7 +442,6 @@ void show_winner() {
       break;
     }
   }
-  clear_screen();
   COLOR(255);
   if (-1 == alive) {
     // Draw "THE"
@@ -491,10 +490,10 @@ void init() {
     player_alive[i] = i < nplayers;
     player_x[i] = (i + 1) * SCREEN_WIDTH / (nplayers + 1);
     player_y[i] = RND() % 192;
-    if (RND() % 2) {
-      player_dir[i] = DIR_UP;
-    } else {
+    if (player_y[i] < 96) {
       player_dir[i] = DIR_DOWN;
+    } else {
+      player_dir[i] = DIR_UP;
     }
   }
   for (i = 0; i < SCREEN_WIDTH*SCREEN_HEIGHT/4; i = i + 1) {
