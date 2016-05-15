@@ -220,40 +220,50 @@ void draw_nplayers_str() {
  * (between 2 and 8). The controller in the player 1 position must
  * be used to select.
  */
+uint16 STATE_LENGTH = 12 * MAX_PLAYERS;
 void select_nplayers() {
+  uint16 i;
   // Whether the underline is currently blinking or not
   uint16 blink_on = false;
-  // Store the button state of 1st player's controller in an array.
+  // Store the button state of all players' controllers in an array.
   // Have current and previous states to prevent double presses.
+  uint16[STATE_LENGTH] prev_state_all;
+  uint16[STATE_LENGTH] btn_state_all;
   uint16[12] prev_state;
   uint16[12] btn_state;
-  array_fill(prev_state, 1, 12);
-  array_fill(btn_state, 0, 12);
+  array_fill(prev_state_all, 1, STATE_LENGTH);
+  array_fill(btn_state_all, 0, STATE_LENGTH);
   clear_screen();
   // Draw the number of players UI
   draw_nplayers();
   draw_nplayers_str();
   draw_tron();
-  // Listen for input from the user
+  // Listen for input from any player
   while (true) {
-    get_controller_state(0, btn_state);
-    // B pressed, return so we can start the game
-    if (btn_state[0] && !prev_state[0]) {
-      return;
-    }
-    // Up pressed, increment the number of players
-    if (btn_state[4] && !prev_state[4]) {
-      if (nplayers < MAX_PLAYERS) {
-        nplayers = nplayers + 1;
-        draw_nplayers();
+    prev_state = prev_state_all;
+    btn_state = btn_state_all;
+    for (i = 0; i < MAX_PLAYERS; i = i + 1) {
+      get_controller_state(i, btn_state);
+      // B pressed, return so we can start the game
+      if (btn_state[0] && !prev_state[0]) {
+        return;
       }
-    }
-    // Down pressed, decrement the number of players
-    if (btn_state[5] && !prev_state[5]) {
-      if (MIN_PLAYERS < nplayers) {
-        nplayers = nplayers - 1;
-        draw_nplayers();
+      // Up pressed, increment the number of players
+      if (btn_state[4] && !prev_state[4]) {
+        if (nplayers < MAX_PLAYERS) {
+          nplayers = nplayers + 1;
+          draw_nplayers();
+        }
       }
+      // Down pressed, decrement the number of players
+      if (btn_state[5] && !prev_state[5]) {
+        if (MIN_PLAYERS < nplayers) {
+          nplayers = nplayers - 1;
+          draw_nplayers();
+        }
+      }
+      btn_state = btn_state + 12;
+      prev_state = prev_state + 12;
     }
     // Check for blink
     if (500 < TIME()) {
@@ -267,7 +277,7 @@ void select_nplayers() {
       draw_rect(60, 130, 12, 2);
     }
     // Copy current button state to previous button state
-    array_copy(btn_state, prev_state, 12);
+    array_copy(btn_state_all, prev_state_all, STATE_LENGTH);
   }
 }
 
@@ -410,7 +420,7 @@ void game_loop() {
  * player presses B.
  */
 void show_winner() {
-  uint16[12] prev_state;
+  uint16 pressed;
   uint16[12] btn_state;
   uint16[19] bitmaps = {
     0b111010010010010, // T
@@ -468,15 +478,16 @@ void show_winner() {
       draw_bitmap_3x5(bitmaps[i], -54 + (i * 15), 86, 4);
     }
   }
-  // Wait until the player presses the continue button
-  array_fill(prev_state, 1, 12);
-  array_fill(btn_state, 0, 12);
-  while (true) {
-    get_controller_state(0, btn_state);
-    if (btn_state[0] && !prev_state[0]) {
-      break;
+  // Wait until a player presses the continue button
+  pressed = false;
+  while (!pressed) {
+    for (i = 0; i < MAX_PLAYERS; i = i + 1) {
+      get_controller_state(i, btn_state);
+      if (btn_state[0]) {
+        pressed = true;
+        break;
+      }
     }
-    array_copy(btn_state, prev_state, 12);
   }
 }
 
