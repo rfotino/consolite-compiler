@@ -1,6 +1,8 @@
 /**
- * Tetris in Consolite C
- * Written by Robert Fotino
+ * Tetris in Consolite C.
+ * Uses on-board buttons or 1st SNES controller as input.
+ *
+ * @author Robert Fotino, 2016
  */
 
 /**

@@ -1,4 +1,11 @@
 /**
+ * Tron light cycle game in Consolite C.
+ * Input is taken from the SNES controllers.
+ *
+ * @author Robert Fotino, 2016
+ */
+
+/**
  * Define global constants.
  */
 uint16 true  = 1;
