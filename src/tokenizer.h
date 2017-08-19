@@ -16,10 +16,11 @@ class Tokenizer {
    * traversal. Throws an exception on failure.
    */
   Tokenizer(char *filename);
-  ~Tokenizer();
+
   /**
    * Consumes the next token and returns it.
    */
+
   AtomToken getNext();
   /**
    * Returns the next token without consuming it. Subsequent calls to
@@ -28,13 +29,11 @@ class Tokenizer {
   AtomToken peekNext();
 
  private:
-  int _offset;
-  int _length;
-  int _mmapLength;
-  char *_data;
-  int _lineNum;
+  unsigned int _offset;
+  unsigned int _lineNum;
   bool _hasNext;
   AtomToken _next;
+  std::string _data;
 };
 
 #endif

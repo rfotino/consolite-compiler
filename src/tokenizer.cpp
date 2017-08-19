@@ -4,37 +4,18 @@
  */
 
 #include <fstream>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include "tokenizer.h"
 
 Tokenizer::Tokenizer(char *filename) : _offset(0), _lineNum(1),
                                        _hasNext(false) {
-  int fd = open(filename, O_RDONLY);
-  if (-1 == fd) {
-    throw "Unable to open input file.";
-  }
-  _length = lseek(fd, 0, SEEK_END);
-  if (-1 == _length) {
-    close(fd);
-    throw "Unable to get input file length.";
-  }
-  // Length of memory we allocate with mmap() must be a multiple of
-  // the page size.
-  _mmapLength = ((_length / getpagesize()) + 1) * getpagesize();
-  _data = static_cast<char *>(mmap(NULL, _mmapLength, PROT_READ, MAP_PRIVATE, fd, 0));
-  if (MAP_FAILED == static_cast<void *>(_data)) {
-    close(fd);
-    throw "Unable to map input file.";
-  }
-  close(fd);
-}
-
-Tokenizer::~Tokenizer() {
-  munmap(_data, _mmapLength);
+  std::ifstream inputStream(filename);
+  inputStream.seekg(0, std::ios::end);
+  _data.reserve(inputStream.tellg());
+  inputStream.seekg(0, std::ios::beg);
+  _data.assign(std::istreambuf_iterator<char>(inputStream),
+               std::istreambuf_iterator<char>());
 }
 
 AtomToken Tokenizer::getNext() {
@@ -47,7 +28,7 @@ AtomToken Tokenizer::getNext() {
   std::string token;
   bool singleComment = false;
   bool multiComment = false;
-  while (_offset < _length) {
+  while (_offset < _data.length()) {
     // In the single line comment state, consume until newline.
     if (singleComment) {
       if ('\n' == _data[_offset]) {
@@ -69,7 +50,7 @@ AtomToken Tokenizer::getNext() {
     // If next characters start a single line comment, break
     // if we have a partial token, otherwise go into single line
     // comment state.
-    } else if ('/' == _data[_offset] && _offset + 1 < _length &&
+    } else if ('/' == _data[_offset] && _offset + 1 < _data.length() &&
                '/' == _data[_offset + 1]) {
       if (0 < token.length()) {
         break;
@@ -79,7 +60,7 @@ AtomToken Tokenizer::getNext() {
     // If next characters start a multi-line comment, break
     // if we have a partial token, otherwise go into multi-line
     // comment state.
-    } else if ('/' == _data[_offset] && _offset + 1 < _length &&
+    } else if ('/' == _data[_offset] && _offset + 1 < _data.length() &&
                '*' == _data[_offset + 1]) {
       if (0 < token.length()) {
         break;
@@ -89,7 +70,7 @@ AtomToken Tokenizer::getNext() {
     // If next two characters form a known two-character operator,
     // break if we have a partial token, otherwise set the next
     // two characters as the token and break.
-    } else if (_offset + 1 < _length &&
+    } else if (_offset + 1 < _data.length() &&
                (('|' == _data[_offset] && '|' == _data[_offset + 1]) ||
                 ('&' == _data[_offset] && '&' == _data[_offset + 1]) ||
                 ('=' == _data[_offset] && '=' == _data[_offset + 1]) ||
